@@ -1,18 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
-  TouchableOpacity, 
-  ActivityIndicator, 
+  TouchableOpacity,
+  ActivityIndicator,
   ScrollView
 } from 'react-native';
+import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AdminLayout from '../../src/components/AdminLayout';
-import StatCard from '../../src/components/admin/StatCard';
-import { adminService } from '../../src/services/adminApi';
 
-// Mock data for stats until the backend endpoints are ready
+// Mock data for stats
 const MOCK_STATS = {
   totalUsers: 42,
   activeUsers: 36,
@@ -23,118 +22,160 @@ const MOCK_STATS = {
 export default function AdminDashboard() {
   const [stats, setStats] = useState(MOCK_STATS);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  const pathname = usePathname();
+  const hasMounted = useRef(false);
+  const renderCount = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasLoaded = useRef(false);
+  const isStatsDisplayed = useRef(false);
 
-  // Fetch stats on component mount
+  // Add logging on mount - with check to prevent double mounting
   useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true);
-        // Uncomment once backend endpoint is ready
-        // const response = await adminService.getUserStats();
-        // setStats(response.data);
-        
-        // For now, use mock data with slight delay to simulate loading
-        setTimeout(() => {
-          setStats(MOCK_STATS);
+    // Skip this effect if it has already run
+    if (hasMounted.current) {
+      console.log('AdminDashboard - Preventing duplicate mount');
+      return;
+    }
+    
+    hasMounted.current = true;
+    console.log('AdminDashboard component mounted - pathname:', pathname);
+    
+    // Simulate loading on mount - but only once
+    if (!hasLoaded.current) {
+      hasLoaded.current = true;
+      
+      // Clear any existing timers
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+      }
+      
+      // Set new timer
+      timerRef.current = setTimeout(() => {
+        // Only update state if component is still mounted
+        if (hasMounted.current && !isStatsDisplayed.current) {
+          isStatsDisplayed.current = true;
           setLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error('Error fetching stats:', error);
-        setLoading(false);
+          console.log('AdminDashboard loaded - displaying stats');
+        }
+        timerRef.current = null;
+      }, 1000);
+    }
+
+    return () => {
+      console.log('AdminDashboard component unmounted');
+      // Only reset mounted flag when actually changing routes
+      if (pathname !== '/admin/') {
+        hasMounted.current = false;
+      }
+      
+      // Clear timer on unmount
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
       }
     };
+  }, [pathname]);
 
-    fetchStats();
-  }, []);
+  // Use useEffect for state updates to prevent multiple renders
+  useEffect(() => {
+    // This runs when loading state changes
+    if (!loading && isStatsDisplayed.current) {
+      console.log('Stats display confirmed');
+    }
+  }, [loading]);
+
+  const handleRefresh = () => {
+    console.log('AdminDashboard refresh triggered');
+    setLoading(true);
+    isStatsDisplayed.current = false;
+    
+    // Clear any existing timers
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+    }
+    
+    // Set new timer
+    timerRef.current = setTimeout(() => {
+      // Only update state if component is still mounted
+      if (hasMounted.current && !isStatsDisplayed.current) {
+        isStatsDisplayed.current = true;
+        setLoading(false);
+        console.log('AdminDashboard refreshed - displaying stats');
+      }
+      timerRef.current = null;
+    }, 1000);
+  };
+
+  const goToApprovals = () => {
+    router.push('/admin/approvals');
+  };
+
+  // Control render logging to reduce noise
+  renderCount.current += 1;
+  if (renderCount.current <= 2) {
+    console.log(`Rendering AdminDashboard (render #${renderCount.current}) with stats:`, stats);
+  }
 
   return (
     <AdminLayout>
-      <View style={styles.headerContainer}>
-        <Text style={styles.headerTitle}>Dashboard</Text>
-        <TouchableOpacity 
-          style={styles.refreshButton}
-          onPress={() => {
-            setLoading(true);
-            setTimeout(() => setLoading(false), 1000);
-          }}
-        >
-          {loading ? (
-            <ActivityIndicator color="#DF0000" size="small" />
-          ) : (
-            <Ionicons name="refresh-outline" size={24} color="#DF0000" />
-          )}
-        </TouchableOpacity>
+      <View style={styles.container}>
+        <View style={styles.headerContainer}>
+          <Text style={styles.headerTitle}>Dashboard</Text>
+          <TouchableOpacity 
+            style={styles.refreshButton}
+            onPress={handleRefresh}
+          >
+            {loading ? (
+              <ActivityIndicator color="#DF0000" size="small" />
+            ) : (
+              <Ionicons name="refresh-outline" size={24} color="#DF0000" />
+            )}
+          </TouchableOpacity>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false}>
+          {/* Simple Stat Boxes */}
+          <View style={styles.statsContainer}>
+            <View style={styles.statBox}>
+              <Ionicons name="people-outline" size={30} color="#3498db" />
+              <Text style={styles.statValue}>{stats.totalUsers}</Text>
+              <Text style={styles.statLabel}>Total Users</Text>
+            </View>
+
+            <View style={styles.statBox}>
+              <Ionicons name="checkmark-circle-outline" size={30} color="#2ecc71" />
+              <Text style={styles.statValue}>{stats.activeUsers}</Text>
+              <Text style={styles.statLabel}>Active Users</Text>
+            </View>
+
+            <TouchableOpacity 
+              style={[styles.statBox, styles.pendingBox]}
+              onPress={goToApprovals}
+            >
+              <Ionicons name="time-outline" size={30} color="#DF0000" />
+              <Text style={styles.statValue}>{stats.pendingApprovals}</Text>
+              <Text style={styles.statLabel}>Pending Approvals</Text>
+              <View style={styles.manageButton}>
+                <Text style={styles.manageText}>Manage</Text>
+                <Ionicons name="arrow-forward-outline" size={14} color="#fff" />
+              </View>
+            </TouchableOpacity>
+
+            <View style={styles.statBox}>
+              <Ionicons name="shield-checkmark-outline" size={30} color="#9b59b6" />
+              <Text style={styles.statValue}>{stats.admins}</Text>
+              <Text style={styles.statLabel}>Administrators</Text>
+            </View>
+          </View>
+          
+          {/* Add Last Login Information for consistency with (tabs) dashboard */}
+          <View style={styles.lastLoginContainer}>
+            <Ionicons name="time-outline" size={20} color="#DF0000" />
+            <Text style={styles.lastLoginText}>Last login: {new Date().toLocaleString()}</Text>
+          </View>
+        </ScrollView>
       </View>
-
-      <ScrollView style={styles.container}>
-        <Text style={styles.sectionTitle}>Overview</Text>
-        
-        <View style={styles.statsContainer}>
-          <StatCard 
-            title="Total Users" 
-            value={stats.totalUsers} 
-            icon="people-outline" 
-            color="#3498db" 
-          />
-          <StatCard 
-            title="Active Users" 
-            value={stats.activeUsers} 
-            icon="checkmark-circle-outline" 
-            color="#2ecc71" 
-          />
-          <StatCard 
-            title="Pending Approvals" 
-            value={stats.pendingApprovals} 
-            icon="time-outline" 
-            color="#DF0000" 
-          />
-          <StatCard 
-            title="Administrators" 
-            value={stats.admins} 
-            icon="shield-checkmark-outline" 
-            color="#9b59b6" 
-          />
-        </View>
-
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        <View style={styles.activityContainer}>
-          <View style={styles.activityItem}>
-            <View style={styles.activityIconContainer}>
-              <Ionicons name="person-add-outline" size={24} color="#DF0000" />
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityText}>
-                <Text style={styles.highlight}>John Doe</Text> registered a new account
-              </Text>
-              <Text style={styles.activityTime}>5 minutes ago</Text>
-            </View>
-          </View>
-          
-          <View style={styles.activityItem}>
-            <View style={styles.activityIconContainer}>
-              <Ionicons name="checkmark-circle-outline" size={24} color="#2ecc71" />
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityText}>
-                <Text style={styles.highlight}>Admin</Text> approved <Text style={styles.highlight}>Jane Smith</Text>'s account
-              </Text>
-              <Text style={styles.activityTime}>2 hours ago</Text>
-            </View>
-          </View>
-          
-          <View style={styles.activityItem}>
-            <View style={styles.activityIconContainer}>
-              <Ionicons name="close-circle-outline" size={24} color="#e74c3c" />
-            </View>
-            <View style={styles.activityContent}>
-              <Text style={styles.activityText}>
-                <Text style={styles.highlight}>Admin</Text> deactivated <Text style={styles.highlight}>Mike Johnson</Text>'s account
-              </Text>
-              <Text style={styles.activityTime}>1 day ago</Text>
-            </View>
-          </View>
-        </View>
-      </ScrollView>
     </AdminLayout>
   );
 }
@@ -142,6 +183,7 @@ export default function AdminDashboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#111',
   },
   headerContainer: {
     flexDirection: 'row',
@@ -150,7 +192,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   headerTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
   },
@@ -163,53 +205,60 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 15,
-    marginTop: 25,
-  },
   statsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+    justifyContent: 'space-between',
   },
-  activityContainer: {
+  statBox: {
+    width: '48%',
     backgroundColor: '#222',
     borderRadius: 10,
-    padding: 15,
-    marginBottom: 20,
-  },
-  activityItem: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#333',
-  },
-  activityIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#333',
-    justifyContent: 'center',
+    padding: 20,
+    marginBottom: 15,
     alignItems: 'center',
-    marginRight: 10,
   },
-  activityContent: {
-    flex: 1,
+  pendingBox: {
+    borderWidth: 1,
+    borderColor: '#DF0000',
   },
-  activityText: {
-    color: '#ccc',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  highlight: {
-    color: '#fff',
+  statValue: {
+    fontSize: 28,
     fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 10,
   },
-  activityTime: {
-    color: '#777',
-    fontSize: 12,
+  statLabel: {
+    fontSize: 14,
+    color: '#aaa',
     marginTop: 5,
+  },
+  manageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#DF0000',
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  manageText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+    marginRight: 5,
+  },
+  lastLoginContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#222',
+    padding: 15,
+    borderRadius: 10,
+    marginVertical: 10,
+  },
+  lastLoginText: {
+    color: '#aaa',
+    marginLeft: 10,
+    fontSize: 14,
   },
 }); 

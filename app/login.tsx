@@ -51,7 +51,24 @@ export default function LoginScreen() {
       console.log('Calling login with email:', email);
       const result = await login(email, password);
       console.log('Login result:', result);
-      // The redirection will be handled by the ProtectedRoute
+      
+      if (result.success) {
+        // Get the user from AsyncStorage to check role
+        const userStr = await AsyncStorage.getItem('user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          console.log('User role from storage after login:', user.role);
+          
+          // Redirect based on role
+          if (user.role && user.role.toUpperCase() === 'ADMIN') {
+            console.log('Redirecting admin to dashboard');
+            router.replace('/admin/' as any);
+          } else {
+            console.log('Redirecting user to home');
+            router.replace('/(tabs)');
+          }
+        }
+      }
     } catch (error: any) {
       console.error('Login error in component:', error);
       

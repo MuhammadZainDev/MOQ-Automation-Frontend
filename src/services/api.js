@@ -1,6 +1,9 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// Flag to prevent multiple redirects
+let isRedirecting = false;
+
 // Create axios instance with base URL
 const API = axios.create({
   baseURL: 'http://192.168.0.106:4000/api',
@@ -25,13 +28,11 @@ API.interceptors.request.use(async (config) => {
         await AsyncStorage.removeItem('tokenExpiry');
         await AsyncStorage.removeItem('user');
         
-        // Force reload to trigger login redirection
-        if (typeof window !== 'undefined') {
-          setTimeout(() => {
-            // This timeout is needed to allow the current request to complete
-            // without a token, which will likely result in a 401 anyway
-            window.location.reload();
-          }, 500);
+        // Only redirect if not already redirecting
+        if (!isRedirecting && typeof window !== 'undefined') {
+          isRedirecting = true;
+          // Use router navigation instead of window reload
+          // We'll let the Protected route handle redirection naturally
         }
       } else {
         // Add token to headers if valid
@@ -48,18 +49,19 @@ API.interceptors.request.use(async (config) => {
 API.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response && error.response.status === 401) {
+    if (error.response && error.response.status === 401 && !isRedirecting) {
       console.log('Received 401 unauthorized response, clearing auth data');
       try {
+        // Set redirecting flag to prevent multiple redirects
+        isRedirecting = true;
+        
         // Clear auth data on 401 responses
         await AsyncStorage.removeItem('token');
         await AsyncStorage.removeItem('tokenExpiry');
         await AsyncStorage.removeItem('user');
         
-        // Force reload to trigger login redirection
-        if (typeof window !== 'undefined') {
-          window.location.reload();
-        }
+        // Let the Protected route handle redirection naturally
+        // instead of forcing a reload
       } catch (err) {
         console.error('Error during unauthorized handling:', err);
       }
@@ -106,6 +108,9 @@ export const authService = {
         throw new Error(response.data.message || 'Login failed');
       }
       
+      // Reset redirecting flag on successful login
+      isRedirecting = false;
+      
       // Store token and token expiry time
       await AsyncStorage.setItem('token', response.data.token);
       
@@ -144,6 +149,9 @@ export const authService = {
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('tokenExpiry');
       await AsyncStorage.removeItem('user');
+      
+      // Reset redirecting flag after logout
+      isRedirecting = false;
     } catch (error) {
       console.log('Error during logout:', error);
     }

@@ -89,7 +89,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       setTokenExpiryTimer(timer);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking token expiry:', error);
       return false;
     }
@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           console.log('No user found in storage');
           setUser(null);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.log('Auth check error:', error);
         setUser(null);
       } finally {
@@ -155,13 +155,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           text2: `Welcome back, ${response.user.name}!`,
           position: 'bottom'
         });
-        // Navigation is now handled by ProtectedRoute, not here
+        
+        // Check user role and redirect accordingly
+        if (response.user.role && response.user.role.toUpperCase() === 'ADMIN') {
+          console.log('Admin user detected, redirecting to admin dashboard');
+          setTimeout(() => {
+            router.replace('/admin/' as any);
+          }, 300);
+        } else {
+          console.log('Regular user detected, redirecting to home');
+          setTimeout(() => {
+            router.replace('/(tabs)');
+          }, 300);
+        }
+        
         return { success: true };
       } else {
         console.log('Invalid login response format:', response);
         throw new Error('Invalid response format from server');
       }
-    } catch (error) {
+    } catch (error: any) {
       const errorMsg = error.message || 'Login failed';
       setError(errorMsg);
       console.error('Login error details:', error);
@@ -248,7 +261,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       // Force redirect to login after logout
       router.replace('/login');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Logout error:', error);
       
       // Even if there's an error, still clear the user state and redirect
