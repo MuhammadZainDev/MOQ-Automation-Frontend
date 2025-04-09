@@ -1,11 +1,9 @@
-import 'react-native-get-random-values'; // This polyfill MUST come before uuid
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { v4 as uuidv4 } from 'uuid';
 
 // Create axios instance with base URL
 const API = axios.create({
-  baseURL: 'http://10.0.91.127:4000/api',
+  baseURL: 'http://192.168.0.106:4000/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -15,8 +13,30 @@ const API = axios.create({
 API.interceptors.request.use(async (config) => {
   try {
     const token = await AsyncStorage.getItem('token');
+    const tokenExpiry = await AsyncStorage.getItem('tokenExpiry');
+    
+    // Check if token exists and is not expired
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      // Check token expiration
+      if (tokenExpiry && new Date().getTime() > parseInt(tokenExpiry, 10)) {
+        console.log('Token expired, clearing auth data');
+        // Clear auth data if token expired
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('tokenExpiry');
+        await AsyncStorage.removeItem('user');
+        
+        // Force reload to trigger login redirection
+        if (typeof window !== 'undefined') {
+          setTimeout(() => {
+            // This timeout is needed to allow the current request to complete
+            // without a token, which will likely result in a 401 anyway
+            window.location.reload();
+          }, 500);
+        }
+      } else {
+        // Add token to headers if valid
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
   } catch (error) {
     console.log('Error getting token:', error);
@@ -24,135 +44,97 @@ API.interceptors.request.use(async (config) => {
   return config;
 });
 
+// Add response interceptor for handling 401 Unauthorized errors
+API.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response && error.response.status === 401) {
+      console.log('Received 401 unauthorized response, clearing auth data');
+      try {
+        // Clear auth data on 401 responses
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('tokenExpiry');
+        await AsyncStorage.removeItem('user');
+        
+        // Force reload to trigger login redirection
+        if (typeof window !== 'undefined') {
+          window.location.reload();
+        }
+      } catch (err) {
+        console.error('Error during unauthorized handling:', err);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Auth services
 export const authService = {
   // Register a new user
   signup: async (userData) => {
     try {
       console.log('Signing up with data:', userData);
-
-      // Create a fallback ID in case UUID fails
-      let userId;
-      try {
-        // Try to generate a UUID
-        userId = uuidv4();
-        console.log('Generated UUID successfully:', userId);
-      } catch (uuidError) {
-        // Fallback to timestamp-based ID if UUID fails
-        console.error('UUID generation failed, using fallback ID:', uuidError);
-        userId = 'user_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-      }
-
-      // Create a mock user with UUID/fallback ID
-      const mockUser = {
-        id: userId,
-        name: userData.name,
-        email: userData.email,
-        role: 'user',
-      };
       
-      // Create a mock token
-      const mockToken = `mock-token-${Date.now()}`;
+      const response = await API.post('/auth/signup', userData);
+      console.log('Server signup response:', response.data);
       
-      // Create the response object
-      const mockResponse = {
-        user: mockUser,
-        token: mockToken,
-      };
-      
-      console.log('Created mock user:', mockUser);
-      
-      // Try server request first (but will use mock data regardless)
-      try {
-        const response = await API.post('/auth/signup', userData);
-        console.log('Server signup response:', response.data);
-        
-        // If server responds correctly, use its data (not implemented yet)
-        // For now we'll just use our mock data
-      } catch (serverError) {
-        console.log('Server signup failed, using mock data:', serverError.message || 'Server unavailable');
+      if (response.data.status !== 'success') {
+        throw new Error(response.data.message || 'Signup failed');
       }
       
-      // Store token and user data
-      await AsyncStorage.setItem('token', mockToken);
-      await AsyncStorage.setItem('user', JSON.stringify(mockUser));
-      
-      console.log('Stored user data in AsyncStorage');
-      
-      // Always return the mock response for now
-      return mockResponse;
+      // The backend doesn't return a token on signup, only on login
+      return {
+        user: response.data.data.user
+      };
     } catch (error) {
       console.error('Signup error:', error);
-      throw { message: error.message || 'Network error during signup' };
+      throw { 
+        message: error.response?.data?.message || error.message || 'Network error during signup' 
+      };
     }
   },
 
   // Login user
   login: async (credentials) => {
     try {
-      console.log('Logging in with credentials:', credentials);
+      console.log('Logging in with credentials:', credentials.email);
       
-      // For the login shown in the database screenshot (zain@gmail.com)
-      let mockUser;
-      if (credentials.email === 'zain@gmail.com') {
-        mockUser = {
-          id: 4, // Using the ID from the database screenshot
-          name: 'Zain',
-          email: 'zain@gmail.com',
-          role: 'user',
-        };
-      } else {
-        // Create a fallback ID in case UUID fails
-        let userId;
-        try {
-          // Try to generate a UUID
-          userId = uuidv4();
-          console.log('Generated UUID successfully for login:', userId);
-        } catch (uuidError) {
-          // Fallback to timestamp-based ID if UUID fails
-          console.error('UUID generation failed for login, using fallback ID:', uuidError);
-          userId = 'user_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
-        }
-        
-        // For any other email, create a mock user with UUID/fallback ID
-        mockUser = {
-          id: userId,
-          name: credentials.email.split('@')[0], // Use part of email as name
-          email: credentials.email,
-          role: 'user',
-        };
+      const response = await API.post('/auth/login', credentials);
+      console.log('Login response from server:', response.data);
+      
+      if (response.data.status !== 'success' || !response.data.token) {
+        throw new Error(response.data.message || 'Login failed');
       }
       
-      // Create a mock token
-      const mockToken = `mock-token-${Date.now()}`;
+      // Store token and token expiry time
+      await AsyncStorage.setItem('token', response.data.token);
       
-      // Create the response object
-      const mockResponse = {
-        user: mockUser,
-        token: mockToken,
+      // Calculate token expiry time (15 days from now in milliseconds)
+      const expiryTime = new Date().getTime() + (15 * 24 * 60 * 60 * 1000);
+      await AsyncStorage.setItem('tokenExpiry', expiryTime.toString());
+      
+      // Log received user data for debugging
+      console.log('User data from server:', response.data.data.user);
+      console.log('User role from server:', response.data.data.user.role);
+      console.log('Token expiry set to:', new Date(expiryTime).toLocaleString());
+      
+      await AsyncStorage.setItem('user', JSON.stringify(response.data.data.user));
+      
+      console.log('Stored user data in AsyncStorage');
+      
+      // Verify the stored data (debugging)
+      const storedUser = await AsyncStorage.getItem('user');
+      console.log('Stored user data in AsyncStorage (verified):', JSON.parse(storedUser));
+      
+      return {
+        user: response.data.data.user,
+        token: response.data.token
       };
-      
-      console.log('Created mock login response:', mockResponse);
-      
-      // Try server request (but will use mock data regardless)
-      try {
-        const response = await API.post('/auth/login', credentials);
-        console.log('Login response from server:', response.data);
-        // If server responds correctly, we could use its data (not implemented yet)
-      } catch (serverError) {
-        console.log('Server login failed, using mock data:', serverError.message || 'Server unavailable');
-      }
-      
-      // Store token and user data
-      await AsyncStorage.setItem('token', mockToken);
-      await AsyncStorage.setItem('user', JSON.stringify(mockUser));
-      console.log('Stored user data in AsyncStorage for login');
-      
-      // Always return the mock response for now
-      return mockResponse;
     } catch (error) {
       console.error('Login error:', error);
-      throw { message: error.message || 'Network error during login' };
+      throw { 
+        message: error.response?.data?.message || error.message || 'Network error during login' 
+      };
     }
   },
 
@@ -160,6 +142,7 @@ export const authService = {
   logout: async () => {
     try {
       await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('tokenExpiry');
       await AsyncStorage.removeItem('user');
     } catch (error) {
       console.log('Error during logout:', error);
@@ -169,12 +152,20 @@ export const authService = {
   // Get current user
   getCurrentUser: async () => {
     try {
+      // Check if token is expired
+      const tokenExpiry = await AsyncStorage.getItem('tokenExpiry');
+      if (tokenExpiry && new Date().getTime() > parseInt(tokenExpiry, 10)) {
+        console.log('Token expired during getCurrentUser check, logging out');
+        await authService.logout();
+        return null;
+      }
+      
       const userStr = await AsyncStorage.getItem('user');
-      console.log('Current user data from storage:', userStr);
       if (!userStr) return null;
       
       const user = JSON.parse(userStr);
-      console.log('Parsed user object:', user);
+      console.log('Retrieved user from storage:', user);
+      console.log('User role from storage:', user.role);
       return user;
     } catch (error) {
       console.log('Error getting user:', error);
@@ -185,7 +176,21 @@ export const authService = {
   // Check if user is authenticated
   isAuthenticated: async () => {
     try {
-      return !!(await AsyncStorage.getItem('token'));
+      const token = await AsyncStorage.getItem('token');
+      const tokenExpiry = await AsyncStorage.getItem('tokenExpiry');
+      
+      // If no token, not authenticated
+      if (!token) return false;
+      
+      // If token exists but expiry date has passed, clear auth and return false
+      if (tokenExpiry && new Date().getTime() > parseInt(tokenExpiry, 10)) {
+        console.log('Token expired during authentication check, logging out');
+        await authService.logout();
+        return false;
+      }
+      
+      // Token exists and is not expired
+      return true;
     } catch (error) {
       console.log('Error checking authentication:', error);
       return false;

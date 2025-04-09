@@ -1,16 +1,44 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScrollView, View, TextInput, TouchableOpacity, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
+import InactiveAccountModal from '../src/components/InactiveAccountModal';
+import ApprovalModal from '../src/components/ApprovalModal';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function LoginScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [inactiveModalVisible, setInactiveModalVisible] = useState(false);
+  const [approvalModalVisible, setApprovalModalVisible] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
+
+  // Check if coming from signup to show approval modal
+  useEffect(() => {
+    const checkShowApprovalModal = async () => {
+      try {
+        const shouldShow = await AsyncStorage.getItem('show_approval_modal');
+        
+        if (shouldShow === 'true') {
+          // Clear the flag first
+          await AsyncStorage.removeItem('show_approval_modal');
+          
+          // Show the modal after a 2 second delay
+          setTimeout(() => {
+            setApprovalModalVisible(true);
+          }, 1000);
+        }
+      } catch (error) {
+        console.error('Error checking approval modal flag:', error);
+      }
+    };
+    
+    checkShowApprovalModal();
+  }, []);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -26,10 +54,20 @@ export default function LoginScreen() {
       // The redirection will be handled by the ProtectedRoute
     } catch (error: any) {
       console.error('Login error in component:', error);
-      Alert.alert('Login Failed', error.message || 'Invalid credentials');
+      
+      // Check if it's an inactive account error
+      if (error.message && error.message.includes('not active')) {
+        setInactiveModalVisible(true);
+      } else {
+        Alert.alert('Login Failed', error.message || 'Invalid credentials');
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApprovalModalClose = () => {
+    setApprovalModalVisible(false);
   };
 
   return (
@@ -95,6 +133,19 @@ export default function LoginScreen() {
         <Text style={styles.footerText}>Don't have an account?</Text>
         <Link href="/signup" style={styles.signupText}>Sign Up</Link>
       </View>
+
+      {/* Inactive Account Modal */}
+      <InactiveAccountModal 
+        visible={inactiveModalVisible}
+        onClose={() => setInactiveModalVisible(false)}
+        email={email}
+      />
+
+      {/* Approval Modal - shown after signup */}
+      <ApprovalModal 
+        visible={approvalModalVisible}
+        onClose={handleApprovalModalClose}
+      />
     </ScrollView>
   );
 }

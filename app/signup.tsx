@@ -3,6 +3,7 @@ import { ScrollView, View, TextInput, TouchableOpacity, Text, StyleSheet, Alert,
 import { Link, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SignupScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -38,13 +39,12 @@ export default function SignupScreen() {
       const result = await signup(name, email, password);
       console.log('Signup result:', result);
       
-      // If signup was successful, navigate to login
+      // If signup was successful, redirect to login and store signup info for the modal
       if (result && result.success) {
-        console.log('Navigating to login after successful signup');
-        // Add a small delay to ensure the toast is shown first
-        setTimeout(() => {
-          router.replace('/login');
-        }, 500);
+        console.log('Signup successful, redirecting to login');
+        // Store info for showing modal on login screen
+        await AsyncStorage.setItem('show_approval_modal', 'true');
+        router.replace('/login');
       }
     } catch (error: any) {
       console.error('Signup error in component:', error);

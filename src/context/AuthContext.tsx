@@ -2,6 +2,7 @@ import React, { createContext, useState, useContext, useEffect, ReactNode } from
 import { authService } from '../services/api';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // User type definition
 type User = {
@@ -9,6 +10,7 @@ type User = {
   name: string;
   email: string;
   role: string;
+  isActive: boolean;
 };
 
 // Auth context type definition
@@ -19,6 +21,7 @@ type AuthContextType = {
   login: (email: string, password: string) => Promise<{success: boolean, error?: string}>;
   signup: (name: string, email: string, password: string) => Promise<{success: boolean, error?: string}>;
   logout: () => void;
+  checkTokenExpiry: () => Promise<boolean>;
 };
 
 // Create the auth context with default values
@@ -29,6 +32,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => ({ success: false }),
   signup: async () => ({ success: false }),
   logout: () => {},
+  checkTokenExpiry: async () => false,
 });
 
 // Auth provider props
@@ -41,6 +45,55 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tokenExpiryTimer, setTokenExpiryTimer] = useState<NodeJS.Timeout | null>(null);
+
+  // Check if token is expired and set up auto-logout timer
+  const checkTokenExpiry = async () => {
+    try {
+      const tokenExpiry = await AsyncStorage.getItem('tokenExpiry');
+      
+      if (!tokenExpiry) {
+        return false;
+      }
+      
+      const expiryTime = parseInt(tokenExpiry, 10);
+      const currentTime = new Date().getTime();
+      
+      // If token is expired, logout user
+      if (currentTime > expiryTime) {
+        console.log('Token has expired, logging out');
+        logout();
+        return false;
+      }
+      
+      // Set up timer to auto-logout when token expires
+      const timeUntilExpiry = expiryTime - currentTime;
+      console.log(`Token expires in ${Math.round(timeUntilExpiry / (1000 * 60 * 60 * 24))} days`);
+      
+      // Clear any existing timer
+      if (tokenExpiryTimer) {
+        clearTimeout(tokenExpiryTimer);
+      }
+      
+      // Set new timer to logout when token expires
+      const timer = setTimeout(() => {
+        console.log('Token expiry timer triggered, logging out');
+        logout();
+        Toast.show({
+          type: 'info',
+          text1: 'Session Expired',
+          text2: 'Your session has expired. Please login again.',
+          position: 'bottom'
+        });
+      }, timeUntilExpiry);
+      
+      setTokenExpiryTimer(timer);
+      return true;
+    } catch (error) {
+      console.error('Error checking token expiry:', error);
+      return false;
+    }
+  };
 
   // Check if user is logged in on component mount
   useEffect(() => {
@@ -53,6 +106,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (currentUser) {
           console.log('Setting user in AuthContext:', currentUser);
           setUser(currentUser);
+          
+          // Set up auto-logout timer
+          await checkTokenExpiry();
         } else {
           console.log('No user found in storage');
           setUser(null);
@@ -67,6 +123,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
     
     checkAuth();
+    
+    // Cleanup timer on unmount
+    return () => {
+      if (tokenExpiryTimer) {
+        clearTimeout(tokenExpiryTimer);
+      }
+    };
   }, []);
 
   // Login method
@@ -82,6 +145,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       if (response && response.user) {
         console.log('Login successful, setting user data:', response.user);
         setUser(response.user);
+        
+        // Set up auto-logout timer
+        await checkTokenExpiry();
+        
         Toast.show({
           type: 'success',
           text1: 'Login Successful',
@@ -158,6 +225,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       console.log('Starting logout process');
       
+      // Clear token expiry timer
+      if (tokenExpiryTimer) {
+        clearTimeout(tokenExpiryTimer);
+        setTokenExpiryTimer(null);
+      }
+      
       // Clear user state first to ensure UI updates immediately
       setUser(null);
       
@@ -199,7 +272,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         error,
         login,
         signup,
-        logout
+        logout,
+        checkTokenExpiry
       }}
     >
       {children}

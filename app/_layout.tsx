@@ -22,15 +22,6 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // Test UUID functionality
-    try {
-      const { v4: uuidv4 } = require('uuid');
-      const testUuid = uuidv4();
-      console.log('UUID test successful, generated:', testUuid);
-    } catch (error) {
-      console.error('UUID test failed:', error);
-    }
-
     if (loaded) {
       SplashScreen.hideAsync();
     }
@@ -51,6 +42,7 @@ export default function RootLayout() {
             <Stack.Screen name="verification-code" options={{ headerShown: false }} />
             <Stack.Screen name="reset-password" options={{ headerShown: false }} />
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="admin" options={{ headerShown: false }} />
             <Stack.Screen name="+not-found" />
           </Stack>
           <StatusBar style="light" />
