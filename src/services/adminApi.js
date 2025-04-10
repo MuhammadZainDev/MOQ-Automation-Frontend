@@ -13,10 +13,11 @@ export const adminService = {
     }
   },
 
-  // Get pending approval users
+  // Get pending approval users (users with isActive=false)
   getPendingApprovals: async () => {
     try {
-      const response = await API.get('/admin/pending-approvals');
+      // Since the admin routes aren't properly registered, use the auth API to get users
+      const response = await API.get('/auth/users?isActive=false');
       return response.data;
     } catch (error) {
       console.error('Error fetching pending approvals:', error);
@@ -28,7 +29,7 @@ export const adminService = {
   approveUser: async (userId) => {
     try {
       const response = await API.post('/auth/toggle-active', {
-        userId,
+        userId: parseInt(userId, 10),
         isActive: true
       });
       return response.data;
@@ -42,7 +43,7 @@ export const adminService = {
   deactivateUser: async (userId) => {
     try {
       const response = await API.post('/auth/toggle-active', {
-        userId,
+        userId: parseInt(userId, 10),
         isActive: false
       });
       return response.data;
@@ -55,7 +56,7 @@ export const adminService = {
   // Get all users
   getAllUsers: async () => {
     try {
-      const response = await API.get('/admin/users');
+      const response = await API.get('/auth/users');
       return response.data;
     } catch (error) {
       console.error('Error fetching users:', error);

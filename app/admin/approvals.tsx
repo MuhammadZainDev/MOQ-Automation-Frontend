@@ -12,63 +12,105 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AdminLayout from '../../src/components/AdminLayout';
+import { adminService } from '../../src/services/adminApi';
+import ConfirmationModal from '../../src/components/ConfirmationModal';
+import Toast from 'react-native-toast-message';
 
-// Mock data for pending users
-const MOCK_PENDING_USERS = [
-  { id: '1', name: 'John Doe', email: 'john.doe@example.com', createdAt: '2023-10-15' },
-  { id: '2', name: 'Jane Smith', email: 'jane.smith@example.com', createdAt: '2023-10-14' },
-  { id: '3', name: 'Mike Johnson', email: 'mike.j@example.com', createdAt: '2023-10-12' },
-  { id: '4', name: 'Sarah Williams', email: 'sarah.w@example.com', createdAt: '2023-10-10' },
-  { id: '5', name: 'David Brown', email: 'david.b@example.com', createdAt: '2023-10-08' },
-  { id: '6', name: 'Emily Davis', email: 'emily.d@example.com', createdAt: '2023-10-05' },
-];
+// Define the user type
+type PendingUser = {
+  id: string;
+  name: string;
+  email: string;
+  createdAt: string;
+};
 
 export default function ApprovalsScreen() {
-  const [pendingUsers, setPendingUsers] = useState(MOCK_PENDING_USERS);
+  const [pendingUsers, setPendingUsers] = useState<PendingUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const router = useRouter();
 
-  // Simulate loading on mount
-  useEffect(() => {
-    setTimeout(() => {
+  const fetchPendingUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await adminService.getPendingApprovals();
+      if (response.success) {
+        setPendingUsers(response.data.map((user: any) => ({
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          createdAt: new Date(user.createdAt).toLocaleDateString()
+        })));
+      }
+    } catch (error) {
+      console.error('Error fetching pending users:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to fetch pending users. Please try again.',
+        position: 'bottom'
+      });
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingUsers();
   }, []);
 
   const handleApprove = (userId: string) => {
-    // In a real app, this would call an API to approve the user
-    Alert.alert(
-      "Confirm Approval",
-      "Are you sure you want to approve this user?",
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Approve", 
-          onPress: () => {
-            setLoading(true);
-            // Simulate API call
-            setTimeout(() => {
-              setPendingUsers(pendingUsers.filter(user => user.id !== userId));
-              setLoading(false);
-            }, 1000);
-          } 
-        }
-      ]
-    );
+    setSelectedUserId(userId);
+    setConfirmModalVisible(true);
+  };
+
+  const confirmApprove = async () => {
+    if (!selectedUserId) return;
+    
+    try {
+      setLoading(true);
+      const response = await adminService.approveUser(selectedUserId);
+      if (response.success) {
+        // Remove the approved user from the list
+        setPendingUsers(prev => prev.filter(user => user.id !== selectedUserId));
+        
+        // Show success toast
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'User has been approved successfully.',
+          position: 'bottom'
+        });
+      }
+    } catch (error) {
+      console.error('Error approving user:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to approve user. Please try again.',
+        position: 'bottom'
+      });
+    } finally {
+      setLoading(false);
+      setSelectedUserId(null);
+    }
   };
 
   const handleRefresh = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    fetchPendingUsers();
   };
 
   const filteredUsers = pendingUsers.filter(user => 
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Find the selected user for the confirmation modal
+  const selectedUser = selectedUserId 
+    ? pendingUsers.find(user => user.id === selectedUserId) 
+    : null;
 
   return (
     <AdminLayout>
@@ -149,6 +191,19 @@ export default function ApprovalsScreen() {
             )}
           </ScrollView>
         </>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {confirmModalVisible && (
+        <ConfirmationModal
+          visible={confirmModalVisible}
+          onClose={() => setConfirmModalVisible(false)}
+          onConfirm={confirmApprove}
+          title="Confirm Approval"
+          message={selectedUser ? `Are you sure you want to approve "${selectedUser.name}"?` : 'Are you sure you want to approve this user?'}
+          confirmText="Approve"
+          cancelText="Cancel"
+        />
       )}
     </AdminLayout>
   );

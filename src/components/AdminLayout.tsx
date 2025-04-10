@@ -80,7 +80,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 16,
     paddingTop: 50,
-    backgroundColor: '#111',
+    backgroundColor: '#000',
   },
   headerTitle: {
     fontSize: 18,
