@@ -91,6 +91,13 @@ export default function AdminLayout() {
             title: 'Admin Settings'
           }} 
         />
+        <Stack.Screen 
+          name="userDetail" 
+          options={{ 
+            headerShown: false,
+            title: 'User Details'
+          }} 
+        />
       </Stack>
     </AdminProtectedRoute>
   );

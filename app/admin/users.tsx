@@ -9,6 +9,7 @@ import {
   TextInput
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import AdminLayout from '../../src/components/AdminLayout';
 import { adminService } from '../../src/services/adminApi';
 import Toast from 'react-native-toast-message';
@@ -28,6 +29,15 @@ export default function UsersScreen() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'active', 'inactive'
+  const router = useRouter();
+
+  // Navigation to user details
+  const navigateToUserDetail = (userId: string) => {
+    router.push({
+      pathname: '/admin/userDetail',
+      params: { id: userId }
+    });
+  };
 
   // Fetch users from API
   const fetchUsers = async () => {
@@ -157,7 +167,11 @@ export default function UsersScreen() {
           <ScrollView style={styles.usersContainer}>
             {filteredUsers.length > 0 ? (
               filteredUsers.map(user => (
-                <View key={user.id} style={styles.userCard}>
+                <TouchableOpacity 
+                  key={user.id} 
+                  style={styles.userCard}
+                  onPress={() => navigateToUserDetail(user.id)}
+                >
                   {/* Admin Badge - Moved to top right */}
                   {user.role === 'admin' && (
                     <View style={styles.adminBadgeTopRight}>
@@ -189,7 +203,7 @@ export default function UsersScreen() {
                       </Text>
                     </View>
                   </View>
-                </View>
+                </TouchableOpacity>
               ))
             ) : (
               <View style={styles.emptyContainer}>
