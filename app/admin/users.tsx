@@ -6,67 +6,75 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
-  TextInput,
-  Switch,
-  Alert
+  TextInput
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AdminLayout from '../../src/components/AdminLayout';
+import { adminService } from '../../src/services/adminApi';
+import Toast from 'react-native-toast-message';
 
-// Mock data for users
-const MOCK_USERS = [
-  { id: '1', name: 'John Doe', email: 'john.doe@example.com', role: 'user', isActive: true, createdAt: '2023-10-05' },
-  { id: '2', name: 'Jane Smith', email: 'jane.smith@example.com', role: 'user', isActive: true, createdAt: '2023-10-06' },
-  { id: '3', name: 'Mike Johnson', email: 'mike.j@example.com', role: 'admin', isActive: true, createdAt: '2023-09-15' },
-  { id: '4', name: 'Sarah Williams', email: 'sarah.w@example.com', role: 'user', isActive: false, createdAt: '2023-10-10' },
-  { id: '5', name: 'David Brown', email: 'david.b@example.com', role: 'user', isActive: true, createdAt: '2023-09-18' },
-  { id: '6', name: 'Emily Davis', email: 'emily.d@example.com', role: 'user', isActive: false, createdAt: '2023-10-01' },
-  { id: '7', name: 'Alex Turner', email: 'alex.t@example.com', role: 'user', isActive: true, createdAt: '2023-09-25' },
-  { id: '8', name: 'Olivia Wilson', email: 'olivia.w@example.com', role: 'user', isActive: true, createdAt: '2023-09-12' },
-];
+// Define user type
+type User = {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  isActive: boolean;
+  createdAt: string;
+};
 
 export default function UsersScreen() {
-  const [users, setUsers] = useState(MOCK_USERS);
+  const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState('all'); // 'all', 'active', 'inactive'
 
-  // Simulate loading on mount
-  useEffect(() => {
-    setTimeout(() => {
+  // Fetch users from API
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const response = await adminService.getAllUsers();
+      
+      if (response.success) {
+        // Format dates and ensure correct data types
+        const formattedUsers = response.data.map((user: any) => ({
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email,
+          role: user.role.toLowerCase(),
+          isActive: Boolean(user.isActive),
+          createdAt: new Date(user.createdAt).toLocaleDateString()
+        }));
+        
+        setUsers(formattedUsers);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to load users. Please try again.',
+          position: 'bottom'
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to load users. Please try again.',
+        position: 'bottom'
+      });
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, []);
-
-  const handleToggleActive = (userId: string, newStatus: boolean) => {
-    // In a real app, this would call an API to update the user status
-    Alert.alert(
-      newStatus ? "Activate User" : "Deactivate User",
-      `Are you sure you want to ${newStatus ? 'activate' : 'deactivate'} this user?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { 
-          text: "Confirm", 
-          onPress: () => {
-            setLoading(true);
-            // Simulate API call
-            setTimeout(() => {
-              setUsers(users.map(user => 
-                user.id === userId ? {...user, isActive: newStatus} : user
-              ));
-              setLoading(false);
-            }, 1000);
-          } 
-        }
-      ]
-    );
+    }
   };
 
+  // Load users on mount
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
   const handleRefresh = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-    }, 1000);
+    fetchUsers();
   };
 
   // Filter users based on search query and active filter
@@ -150,6 +158,13 @@ export default function UsersScreen() {
             {filteredUsers.length > 0 ? (
               filteredUsers.map(user => (
                 <View key={user.id} style={styles.userCard}>
+                  {/* Admin Badge - Moved to top right */}
+                  {user.role === 'admin' && (
+                    <View style={styles.adminBadgeTopRight}>
+                      <Text style={styles.adminBadgeText}>Admin</Text>
+                    </View>
+                  )}
+                  
                   <View style={styles.userInfo}>
                     <View style={[
                       styles.avatarContainer, 
@@ -165,24 +180,14 @@ export default function UsersScreen() {
                     <View style={styles.userDetails}>
                       <View style={styles.userNameRow}>
                         <Text style={styles.userName}>{user.name}</Text>
-                        {user.role === 'admin' && (
-                          <View style={styles.adminBadge}>
-                            <Text style={styles.adminBadgeText}>Admin</Text>
-                          </View>
-                        )}
                       </View>
-                      <Text style={styles.userEmail}>{user.email}</Text>
                       <Text style={styles.userDate}>Joined: {user.createdAt}</Text>
+                      <Text style={styles.statusIndicator}>
+                        Status: <Text style={user.isActive ? styles.activeStatus : styles.inactiveStatus}>
+                          {user.isActive ? 'Active' : 'Inactive'}
+                        </Text>
+                      </Text>
                     </View>
-                  </View>
-                  <View style={styles.userActions}>
-                    <Text style={styles.statusText}>{user.isActive ? 'Active' : 'Inactive'}</Text>
-                    <Switch
-                      value={user.isActive}
-                      onValueChange={(newValue) => handleToggleActive(user.id, newValue)}
-                      trackColor={{ false: '#444', true: 'rgba(223, 0, 0, 0.5)' }}
-                      thumbColor={user.isActive ? '#DF0000' : '#777'}
-                    />
                   </View>
                 </View>
               ))
@@ -323,34 +328,37 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginRight: 8,
   },
-  adminBadge: {
+  adminBadgeTopRight: {
+    position: 'absolute',
+    right: 15,
+    top: 15,
     backgroundColor: 'rgba(44, 130, 201, 0.2)',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
+    zIndex: 1,
   },
   adminBadgeText: {
     color: '#2c82c9',
     fontSize: 12,
     fontWeight: 'bold',
   },
-  userEmail: {
-    color: '#aaa',
-    fontSize: 14,
-    marginBottom: 3,
-  },
   userDate: {
     color: '#777',
     fontSize: 12,
   },
-  userActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusText: {
+  statusIndicator: {
     color: '#aaa',
-    marginRight: 10,
     fontSize: 13,
+    marginTop: 3,
+  },
+  activeStatus: {
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  inactiveStatus: {
+    color: '#E57373',
+    fontWeight: 'bold',
   },
   emptyContainer: {
     alignItems: 'center',
