@@ -25,6 +25,14 @@ type UserDetail = {
   createdAt: string;
 };
 
+type UserAnalytics = {
+  stats: string;
+  views: string;
+  videos: string;
+  watch_hours: string;
+  premium_country_views: string;
+};
+
 // Custom layout component without the header for this page
 function CustomLayout({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
@@ -70,42 +78,21 @@ export default function UserDetailScreen() {
   const [videos, setVideos] = useState('');
   const [watchHours, setWatchHours] = useState('');
   const [premiumCountryViews, setPremiumCountryViews] = useState('');
+  const [savingAnalytics, setSavingAnalytics] = useState(false);
 
-  // Fetch user details
+  // Fetch user details and analytics
   useEffect(() => {
-    const fetchUserDetail = async () => {
+    const fetchUserData = async () => {
       try {
         setLoading(true);
         
-        // Fetch the user from the list of all users for now
-        // Later this can be replaced with a specific API endpoint for user details
-        const response = await adminService.getAllUsers();
-        
-        if (response.success) {
-          const userData = response.data.find((u: any) => u.id.toString() === userId);
-          
-          if (userData) {
-            const formattedUser = {
-              id: userData.id.toString(),
-              name: userData.name,
-              email: userData.email,
-              role: userData.role.toLowerCase(),
-              isActive: Boolean(userData.isActive),
-              createdAt: new Date(userData.createdAt).toLocaleDateString()
-            };
-            
-            setUser(formattedUser);
-            setName(formattedUser.name);
-            setEmail(formattedUser.email);
-          } else {
-            Toast.show({
-              type: 'error',
-              text1: 'Error',
-              text2: 'User not found',
-              position: 'bottom'
-            });
-            router.back();
-          }
+        // Fetch user details
+        const userResponse = await adminService.getUserById(userId);
+        if (userResponse.success && userResponse.data) {
+          const userData = userResponse.data;
+          setUser(userData);
+          setName(userData.name);
+          setEmail(userData.email);
         } else {
           Toast.show({
             type: 'error',
@@ -113,48 +100,93 @@ export default function UserDetailScreen() {
             text2: 'Failed to load user details',
             position: 'bottom'
           });
-          router.back();
+          return;
+        }
+        
+        // Fetch user analytics - use try/catch here to prevent errors from blocking UI
+        try {
+          const analyticsResponse = await adminService.getUserAnalytics(userId);
+          if (analyticsResponse.success && analyticsResponse.data) {
+            const analyticsData = analyticsResponse.data;
+            setStats(analyticsData.stats || '');
+            setViews(analyticsData.views || '');
+            setVideos(analyticsData.videos || '');
+            setWatchHours(analyticsData.watch_hours || '');
+            setPremiumCountryViews(analyticsData.premium_country_views || '');
+          }
+        } catch (analyticsError) {
+          console.log('Analytics not available yet, using default values');
+          // Just use the default values we already have
         }
       } catch (error) {
-        console.error('Error fetching user details:', error);
+        console.error('Error fetching user data:', error);
         Toast.show({
           type: 'error',
           text1: 'Error',
-          text2: 'Failed to load user details',
+          text2: 'Failed to load user data',
           position: 'bottom'
         });
-        router.back();
       } finally {
         setLoading(false);
       }
     };
-
+    
     if (userId) {
-      fetchUserDetail();
-    } else {
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'User ID is required',
-        position: 'bottom'
-      });
-      router.back();
+      fetchUserData();
     }
-  }, [userId, router]);
-
-  const handleSave = () => {
-    // This would be where you would save the user details
-    // For now, just show a success message
-    Toast.show({
-      type: 'success',
-      text1: 'Success',
-      text2: 'User details saved successfully',
-      position: 'bottom'
-    });
-  };
+  }, [userId]);
 
   const handleBack = () => {
     router.back();
+  };
+
+  const handleSave = async () => {
+    try {
+      setSavingAnalytics(true);
+      
+      // Ensure all values are strings and trim any whitespace
+      const analyticsData = {
+        stats: String(stats).trim(),
+        views: String(views).trim(),
+        videos: String(videos).trim(),
+        watch_hours: String(watchHours).trim(),
+        premium_country_views: String(premiumCountryViews).trim()
+      };
+      
+      // Update user analytics
+      const response = await adminService.updateUserAnalytics(userId, analyticsData);
+      
+      if (response.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'User analytics updated successfully',
+          position: 'bottom'
+        });
+        
+        // Redirect to admin dashboard
+        setTimeout(() => {
+          router.push('/admin');
+        }, 1000);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to update user analytics',
+          position: 'bottom'
+        });
+      }
+    } catch (error) {
+      console.error('Error saving user analytics:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to save user analytics',
+        position: 'bottom'
+      });
+    } finally {
+      setSavingAnalytics(false);
+    }
   };
 
   if (loading) {
@@ -237,7 +269,6 @@ export default function UserDetailScreen() {
                   style={styles.input} 
                   placeholder="Enter views" 
                   placeholderTextColor="#777"
-                  keyboardType="numeric"
                   value={views}
                   onChangeText={setViews}
                 />
@@ -255,7 +286,6 @@ export default function UserDetailScreen() {
                   style={styles.input} 
                   placeholder="Enter videos" 
                   placeholderTextColor="#777"
-                  keyboardType="numeric"
                   value={videos}
                   onChangeText={setVideos}
                 />
@@ -270,7 +300,6 @@ export default function UserDetailScreen() {
                   style={styles.input} 
                   placeholder="Enter watch hours" 
                   placeholderTextColor="#777"
-                  keyboardType="numeric"
                   value={watchHours}
                   onChangeText={setWatchHours}
                 />
@@ -285,17 +314,21 @@ export default function UserDetailScreen() {
               style={styles.input} 
               placeholder="Enter premium country views" 
               placeholderTextColor="#777"
-              keyboardType="numeric"
               value={premiumCountryViews}
               onChangeText={setPremiumCountryViews}
             />
           </View>
           
           <TouchableOpacity 
-            style={styles.saveButton} 
+            style={[styles.saveButton, savingAnalytics && styles.savingButton]} 
             onPress={handleSave}
+            disabled={savingAnalytics}
           >
-            <Text style={styles.saveButtonText}>Save Changes</Text>
+            {savingAnalytics ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save Changes</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -469,5 +502,8 @@ const styles = StyleSheet.create({
   disabledInput: {
     opacity: 0.6,
     color: '#aaa',
+  },
+  savingButton: {
+    opacity: 0.7,
   },
 }); 
