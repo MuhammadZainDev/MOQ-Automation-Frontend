@@ -16,6 +16,24 @@ import { adminService } from '../../src/services/adminApi';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../src/context/AuthContext';
 
+// Utility function to format numbers in a human-readable way (1k, 1.2M, etc)
+const formatNumber = (num: number): string => {
+  if (num === 0) return '0';
+  
+  // Handle millions
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  
+  // Handle thousands
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  
+  // Return the number as is if less than 1000
+  return num.toString();
+};
+
 type UserDetail = {
   id: string;
   name: string;
@@ -23,14 +41,16 @@ type UserDetail = {
   role: string;
   isActive: boolean;
   createdAt: string;
+  analytics?: UserAnalytics;
 };
 
 type UserAnalytics = {
-  stats: string;
-  views: string;
-  videos: string;
-  watch_hours: string;
-  premium_country_views: string;
+  stats: number;
+  views: number;
+  videos: number;
+  watch_hours: number;
+  premium_country_views: number;
+  entries?: any[];
 };
 
 // Custom layout component without the header for this page
@@ -108,11 +128,19 @@ export default function UserDetailScreen() {
           const analyticsResponse = await adminService.getUserAnalytics(userId);
           if (analyticsResponse.success && analyticsResponse.data) {
             const analyticsData = analyticsResponse.data;
-            setStats(analyticsData.stats || '');
-            setViews(analyticsData.views || '');
-            setVideos(analyticsData.videos || '');
-            setWatchHours(analyticsData.watch_hours || '');
-            setPremiumCountryViews(analyticsData.premium_country_views || '');
+            
+            // Store analytics data in user object
+            setUser(prevUser => prevUser ? {
+              ...prevUser,
+              analytics: analyticsData
+            } : null);
+            
+            // Set individual analytics fields (for display purposes)
+            setStats('');
+            setViews('');
+            setVideos('');
+            setWatchHours('');
+            setPremiumCountryViews('');
           }
         } catch (analyticsError) {
           console.log('Analytics not available yet, using default values');
@@ -144,30 +172,56 @@ export default function UserDetailScreen() {
     try {
       setSavingAnalytics(true);
       
-      // Ensure all values are strings and trim any whitespace
+      // Convert numeric fields to numbers, default to 0 if invalid
       const analyticsData = {
-        stats: String(stats).trim(),
-        views: String(views).trim(),
-        videos: String(videos).trim(),
-        watch_hours: String(watchHours).trim(),
-        premium_country_views: String(premiumCountryViews).trim()
+        stats: !isNaN(Number(stats)) ? Number(stats) : 0,
+        views: !isNaN(Number(views)) ? Number(views) : 0,
+        videos: !isNaN(Number(videos)) ? Number(videos) : 0,
+        watch_hours: !isNaN(Number(watchHours)) ? Number(watchHours) : 0,
+        premium_country_views: !isNaN(Number(premiumCountryViews)) ? Number(premiumCountryViews) : 0
       };
       
       // Update user analytics
       const response = await adminService.updateUserAnalytics(userId, analyticsData);
       
       if (response.success) {
+        // Clear the input fields
+        setStats('');
+        setViews('');
+        setVideos('');
+        setWatchHours('');
+        setPremiumCountryViews('');
+        
+        // Show success message
         Toast.show({
           type: 'success',
           text1: 'Success',
-          text2: 'User analytics updated successfully',
+          text2: 'Analytics data added successfully',
           position: 'bottom'
         });
         
-        // Redirect to admin dashboard
-        setTimeout(() => {
-          router.push('/admin');
-        }, 1000);
+        // Fetch the updated analytics
+        try {
+          const analyticsResponse = await adminService.getUserAnalytics(userId);
+          if (analyticsResponse.success && analyticsResponse.data) {
+            // Update user analytics data in state
+            setUser(prevUser => prevUser ? {
+              ...prevUser,
+              analytics: analyticsResponse.data
+            } : null);
+            
+            // Show updated totals
+            Toast.show({
+              type: 'info',
+              text1: 'Current Totals Updated',
+              text2: 'Analytics data has been updated',
+              position: 'bottom',
+              visibilityTime: 2000
+            });
+          }
+        } catch (analyticsError) {
+          console.error('Error fetching updated analytics:', analyticsError);
+        }
       } else {
         Toast.show({
           type: 'error',
@@ -245,6 +299,48 @@ export default function UserDetailScreen() {
             />
           </View>
           
+          {/* Note about cumulative behavior */}
+          <View style={styles.noteContainer}>
+            <Ionicons name="information-circle-outline" size={22} color="#777" />
+            <Text style={styles.noteText}>
+              Values you enter will be added to existing analytics data.
+            </Text>
+          </View>
+          
+          {/* Current Analytics Totals */}
+          <View style={styles.currentTotalsContainer}>
+            <Text style={styles.currentTotalsTitle}>Current Analytics Totals</Text>
+            
+            <View style={styles.boxesRow}>
+              <View style={styles.analyticsBox}>
+                <Text style={styles.boxLabel}>Stats</Text>
+                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.stats || 0)}</Text>
+              </View>
+              
+              <View style={styles.analyticsBox}>
+                <Text style={styles.boxLabel}>Views</Text>
+                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.views || 0)}</Text>
+              </View>
+              
+              <View style={styles.analyticsBox}>
+                <Text style={styles.boxLabel}>Videos</Text>
+                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.videos || 0)}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.boxesRowCenter}>
+              <View style={styles.widerAnalyticsBox}>
+                <Text style={styles.boxLabel}>Watch Hours</Text>
+                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.watch_hours || 0)}</Text>
+              </View>
+              
+              <View style={styles.widerAnalyticsBox}>
+                <Text style={styles.boxLabel}>Premium Views</Text>
+                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.premium_country_views || 0)}</Text>
+              </View>
+            </View>
+          </View>
+          
           {/* Stats and Views in a row */}
           <View style={styles.rowContainer}>
             <View style={styles.halfColumn}>
@@ -253,10 +349,11 @@ export default function UserDetailScreen() {
                 <Ionicons name="stats-chart-outline" size={22} color="#777" style={styles.inputIcon} />
                 <TextInput 
                   style={styles.input} 
-                  placeholder="Enter stats" 
+                  placeholder="Enter new stats to add" 
                   placeholderTextColor="#777"
                   value={stats}
                   onChangeText={setStats}
+                  keyboardType="numeric"
                 />
               </View>
             </View>
@@ -267,10 +364,11 @@ export default function UserDetailScreen() {
                 <Ionicons name="eye-outline" size={22} color="#777" style={styles.inputIcon} />
                 <TextInput 
                   style={styles.input} 
-                  placeholder="Enter views" 
+                  placeholder="Enter new views to add" 
                   placeholderTextColor="#777"
                   value={views}
                   onChangeText={setViews}
+                  keyboardType="numeric"
                 />
               </View>
             </View>
@@ -284,10 +382,11 @@ export default function UserDetailScreen() {
                 <Ionicons name="videocam-outline" size={22} color="#777" style={styles.inputIcon} />
                 <TextInput 
                   style={styles.input} 
-                  placeholder="Enter videos" 
+                  placeholder="Enter new videos to add" 
                   placeholderTextColor="#777"
                   value={videos}
                   onChangeText={setVideos}
+                  keyboardType="numeric"
                 />
               </View>
             </View>
@@ -298,10 +397,11 @@ export default function UserDetailScreen() {
                 <Ionicons name="time-outline" size={22} color="#777" style={styles.inputIcon} />
                 <TextInput 
                   style={styles.input} 
-                  placeholder="Enter watch hours" 
+                  placeholder="Enter new watch hours to add" 
                   placeholderTextColor="#777"
                   value={watchHours}
                   onChangeText={setWatchHours}
+                  keyboardType="numeric"
                 />
               </View>
             </View>
@@ -312,10 +412,11 @@ export default function UserDetailScreen() {
             <Ionicons name="globe-outline" size={22} color="#777" style={styles.inputIcon} />
             <TextInput 
               style={styles.input} 
-              placeholder="Enter premium country views" 
+              placeholder="Enter new premium country views to add" 
               placeholderTextColor="#777"
               value={premiumCountryViews}
               onChangeText={setPremiumCountryViews}
+              keyboardType="numeric"
             />
           </View>
           
@@ -327,7 +428,7 @@ export default function UserDetailScreen() {
             {savingAnalytics ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
+              <Text style={styles.saveButtonText}>Add Analytics Data</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -459,6 +560,7 @@ const styles = StyleSheet.create({
     color: '#aaa',
     marginBottom: 8,
     fontSize: 16,
+    fontWeight: '500',
   },
   inputContainer: {
     flexDirection: 'row',
@@ -467,9 +569,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     height: 55,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#444',
   },
   inputIcon: {
     paddingLeft: 15,
+    color: '#999',
   },
   input: {
     flex: 1,
@@ -477,6 +582,7 @@ const styles = StyleSheet.create({
     paddingLeft: 10,
     color: '#fff',
     fontSize: 16,
+    height: '100%',
   },
   saveButton: {
     backgroundColor: '#DF0000',
@@ -505,5 +611,62 @@ const styles = StyleSheet.create({
   },
   savingButton: {
     opacity: 0.7,
+  },
+  noteContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  noteText: {
+    color: '#777',
+    marginLeft: 5,
+  },
+  currentTotalsContainer: {
+    marginBottom: 20,
+  },
+  currentTotalsTitle: {
+    color: '#aaa',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+  boxesRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  analyticsBox: {
+    backgroundColor: '#333',
+    borderWidth: 1,
+    borderColor: '#444',
+    borderRadius: 8,
+    padding: 12,
+    width: '31%',
+    alignItems: 'center',
+  },
+  boxLabel: {
+    color: '#999',
+    fontSize: 12,
+    marginBottom: 5,
+  },
+  boxValue: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  boxesRowCenter: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 10,
+  },
+  widerAnalyticsBox: {
+    backgroundColor: '#333',
+    borderWidth: 1,
+    borderColor: '#444',
+    borderRadius: 8,
+    padding: 12,
+    width: '48%',
+    alignItems: 'center',
+    marginHorizontal: 5,
   },
 }); 
