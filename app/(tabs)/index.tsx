@@ -1,16 +1,73 @@
-import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, SafeAreaView, ActivityIndicator, Alert } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  ScrollView, 
+  TouchableOpacity, 
+  SafeAreaView, 
+  ActivityIndicator, 
+  Alert,
+  Image,
+  StatusBar 
+} from 'react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 
+// Utility function to format numbers in a human-readable way (1k, 1.2M, etc)
+const formatNumber = (num: number): string => {
+  if (num === 0) return '0';
+  
+  // Handle millions
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  }
+  
+  // Handle thousands
+  if (num >= 1000) {
+    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  }
+  
+  // Return the number as is if less than 1000
+  return num.toString();
+};
+
 export default function HomeScreen() {
   const { user, isLoading, logout } = useAuth();
+  const [selectedTimeframe, setSelectedTimeframe] = useState('280');
 
   // Debugging - add console logs
   console.log('Home Screen - isLoading:', isLoading);
   console.log('Home Screen - Current User:', user);
   console.log('Home Screen - Logout Function:', logout ? 'Available' : 'Not Available');
+
+  // Mock analytics data - would come from the API in a real implementation
+  const userAnalytics = {
+    stats: 2500,
+    subs: 1,
+    views: 0,
+    videos: 0
+  };
+
+  // Mock detailed analytics
+  const detailedAnalytics = {
+    subscribers: {
+      value: 0,
+      average: 0,
+      trend: 'down'
+    },
+    views: {
+      value: 7,
+      average: 1.8,
+      trend: 'down'
+    },
+    watchHours: {
+      value: 0,
+      average: 0,
+      trend: 'down'
+    }
+  };
 
   // If still checking authentication, show loading indicator
   if (isLoading) {
@@ -43,13 +100,8 @@ export default function HomeScreen() {
   const handleLogout = () => {
     console.log('Logout button pressed');
     try {
-      if (logout) {
         console.log('Calling logout function');
         logout();
-      } else {
-        console.error('Logout function is not available');
-        Alert.alert('Error', 'Could not logout. Please try again later.');
-      }
     } catch (error) {
       console.error('Error during logout:', error);
       Alert.alert('Error', 'An error occurred during logout');
@@ -58,75 +110,142 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
       <ScrollView style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.headerRow}>
-            <View>
-              <Text style={styles.welcomeText}>Welcome back,</Text>
-              <Text style={styles.nameText}>{user.name}</Text>
+        {/* Channel Header Section */}
+        <View style={styles.channelHeader}>
+          <View style={styles.channelInfo}>
+            <View style={styles.logoContainer}>
+              <Image 
+                source={require('../../assets/logo/logo.jpg')} 
+                style={styles.logo}
+                resizeMode="contain"
+              />
             </View>
-            <TouchableOpacity 
-              style={styles.logoutButton} 
-              onPress={handleLogout}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="log-out-outline" size={20} color="#fff" />
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
+            
+            <View style={styles.channelTextInfo}>
+              <Text style={styles.channelName}>{user.name}</Text>
+              <Text style={styles.lastUpdate}>3 days ago</Text>
           </View>
         </View>
 
-        <View style={styles.dashboardCard}>
-          <View style={styles.cardHeader}>
-            <Ionicons name="stats-chart" size={24} color="#DF0000" />
-            <Text style={styles.cardTitle}>Dashboard</Text>
-          </View>
-          <Text style={styles.cardDescription}>
-            This is your MOQ Automation dashboard. You can view your business stats and automation tasks here.
-          </Text>
+          <TouchableOpacity style={styles.crownIcon}>
+            <Ionicons name="star" size={28} color="#FFA000" />
+          </TouchableOpacity>
         </View>
         
-        <View style={styles.featuresSection}>
-          <Text style={styles.sectionTitle}>Features</Text>
-          
-          <View style={styles.featureRow}>
-            <View style={styles.featureCard}>
-              <Ionicons name="analytics-outline" size={30} color="#DF0000" style={styles.featureIcon} />
-              <Text style={styles.featureTitle}>Analytics</Text>
+        {/* Analytics Boxes */}
+        <View style={styles.analyticsRow}>
+          <View style={styles.analyticsBox}>
+            <View style={styles.analyticsHeader}>
+              <Text style={styles.analyticsTitle}>Stats</Text>
+              <Ionicons name="chevron-forward" size={18} color="#777" />
             </View>
-            
-            <View style={styles.featureCard}>
-              <Ionicons name="cart-outline" size={30} color="#DF0000" style={styles.featureIcon} />
-              <Text style={styles.featureTitle}>Orders</Text>
-            </View>
+            <Text style={styles.analyticsValue}>{formatNumber(userAnalytics.stats)}</Text>
+            <Text style={styles.analyticsTrend}>~</Text>
           </View>
           
-          <View style={styles.featureRow}>
-            <View style={styles.featureCard}>
-              <Ionicons name="cube-outline" size={30} color="#DF0000" style={styles.featureIcon} />
-              <Text style={styles.featureTitle}>Products</Text>
+          <View style={styles.analyticsBox}>
+            <View style={styles.analyticsHeader}>
+              <Text style={styles.analyticsTitle}>Subs</Text>
+              <Ionicons name="chevron-forward" size={18} color="#777" />
             </View>
-            
-            <View style={styles.featureCard}>
-              <Ionicons name="settings-outline" size={30} color="#DF0000" style={styles.featureIcon} />
-              <Text style={styles.featureTitle}>Settings</Text>
-            </View>
+            <Text style={styles.analyticsValue}>{formatNumber(userAnalytics.subs)}</Text>
+            <Text style={styles.analyticsTrend}>~</Text>
           </View>
         </View>
         
-        <View style={styles.statusSection}>
-          <Text style={styles.sectionTitle}>System Status</Text>
-          <View style={styles.statusItem}>
-            <View style={styles.statusIcon}>
-              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+        <View style={styles.analyticsRow}>
+          <View style={styles.analyticsBox}>
+            <View style={styles.analyticsHeader}>
+              <Text style={styles.analyticsTitle}>Views</Text>
+              <Ionicons name="chevron-forward" size={18} color="#777" />
             </View>
-            <Text style={styles.statusText}>All systems operational</Text>
+            <Text style={styles.analyticsValue}>{formatNumber(userAnalytics.views)}</Text>
+            <Text style={styles.analyticsTrend}>~</Text>
           </View>
-          <View style={styles.statusItem}>
-            <View style={styles.statusIcon}>
-              <Ionicons name="time-outline" size={20} color="#DF0000" />
+          
+          <View style={styles.analyticsBox}>
+            <View style={styles.analyticsHeader}>
+              <Text style={styles.analyticsTitle}>Videos</Text>
+              <Ionicons name="chevron-forward" size={18} color="#777" />
             </View>
-            <Text style={styles.statusText}>Last login: {new Date().toLocaleString()}</Text>
+            <Text style={styles.analyticsValue}>{formatNumber(userAnalytics.videos)}</Text>
+            <Text style={styles.analyticsTrend}>~</Text>
+          </View>
+        </View>
+        
+        {/* New Detailed Analytics Section */}
+        <View style={styles.detailedAnalyticsContainer}>
+          {/* Header with timeframe buttons */}
+          <View style={styles.analyticsHeader}>
+            <Text style={styles.analyticsHeaderTitle}>Analytics</Text>
+            <View style={styles.timeframeButtons}>
+              <TouchableOpacity 
+                style={[styles.timeframeButton, selectedTimeframe === '280' && styles.selectedTimeframe]}
+                onPress={() => setSelectedTimeframe('280')}
+              >
+                <Text style={[styles.timeframeText, selectedTimeframe === '280' && styles.selectedTimeframeText]}>28D</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.timeframeButton, selectedTimeframe === '90D' && styles.selectedTimeframe]}
+                onPress={() => setSelectedTimeframe('90D')}
+              >
+                <Text style={styles.timeframeText}>90D</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.timeframeButton, selectedTimeframe === 'Apr' && styles.selectedTimeframe]}
+                onPress={() => setSelectedTimeframe('Apr')}
+              >
+                <Text style={styles.timeframeText}>Apr</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.timeframeButton, selectedTimeframe === 'Mar' && styles.selectedTimeframe]}
+                onPress={() => setSelectedTimeframe('Mar')}
+              >
+                <Text style={styles.timeframeText}>Mar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+          
+          {/* Analytics Cards */}
+          <View style={styles.detailedCardsContainer}>
+            <View style={styles.detailedCardsRow}>
+              {/* Subscribers Card */}
+              <View style={styles.detailedCard}>
+                <Text style={styles.cardTitle}>Subscribers</Text>
+                <Text style={styles.cardValue}>{detailedAnalytics.subscribers.value}</Text>
+                <View style={styles.averageContainer}>
+                  <Text style={styles.averageLabel}>Average</Text>
+                  <Text style={styles.averageValue}>{detailedAnalytics.subscribers.average} / day</Text>
+                </View>
+              </View>
+              
+              {/* Views Card */}
+              <View style={styles.detailedCard}>
+                <Text style={styles.cardTitle}>Views</Text>
+                <Text style={styles.cardValue}>{detailedAnalytics.views.value}</Text>
+                <View style={styles.averageContainer}>
+                  <Text style={styles.averageLabel}>Average</Text>
+                  <Text style={styles.averageValue}>{detailedAnalytics.views.average} / day</Text>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.detailedCardsRow}>
+              {/* Watch Hours Card */}
+              <View style={styles.detailedCard}>
+                <Text style={styles.cardTitle}>Watch hours</Text>
+                <Text style={styles.cardValue}>{detailedAnalytics.watchHours.value}</Text>
+                <View style={styles.averageContainer}>
+                  <Text style={styles.averageLabel}>Average</Text>
+                  <Text style={styles.averageValue}>{detailedAnalytics.watchHours.average} / day</Text>
+                </View>
+              </View>
+            </View>
           </View>
         </View>
       </ScrollView>
@@ -161,106 +280,149 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 50,
   },
-  header: {
-    padding: 20,
-    paddingTop: 40,
-    paddingBottom: 30,
-  },
-  headerRow: {
+  channelHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  welcomeText: {
-    fontSize: 18,
-    color: '#999',
-  },
-  nameText: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#fff',
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#DF0000',
-    paddingVertical: 8,
     paddingHorizontal: 16,
-    borderRadius: 8,
+    paddingVertical: 20,
   },
-  logoutText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    marginLeft: 5,
-  },
-  dashboardCard: {
-    backgroundColor: '#111',
-    margin: 15,
-    borderRadius: 10,
-    padding: 20,
-  },
-  cardHeader: {
+  channelInfo: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
   },
-  cardTitle: {
+  logoContainer: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    borderWidth: 2,
+    borderColor: '#FFA000',
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  logo: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  channelTextInfo: {
+    marginLeft: 16,
+  },
+  channelName: {
     color: '#fff',
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginLeft: 10,
   },
-  cardDescription: {
-    color: '#999',
+  lastUpdate: {
+    color: '#777',
     fontSize: 14,
-    lineHeight: 20,
+    marginTop: 4,
   },
-  featuresSection: {
-    padding: 15,
+  crownIcon: {
+    padding: 8,
   },
-  sectionTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  featureRow: {
+  analyticsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 15,
+    paddingHorizontal: 16,
+    marginBottom: 16,
   },
-  featureCard: {
-    backgroundColor: '#111',
+  analyticsBox: {
+    backgroundColor: '#1A1A1A',
     borderRadius: 10,
-    padding: 15,
-    flex: 0.48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 100,
+    width: '48%',
+    padding: 16,
   },
-  featureIcon: {
+  analyticsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 10,
   },
-  featureTitle: {
-    color: '#fff',
-    fontWeight: 'bold',
+  analyticsTitle: {
+    color: '#999',
+    fontSize: 16,
+    fontWeight: '500',
   },
-  statusSection: {
-    padding: 15,
+  analyticsValue: {
+    color: '#fff',
+    fontSize: 30,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  analyticsTrend: {
+    color: '#777',
+    fontSize: 16,
+  },
+  // New Analytics Styles
+  detailedAnalyticsContainer: {
+    paddingHorizontal: 16,
+    marginTop: 20,
     marginBottom: 30,
   },
-  statusItem: {
+  analyticsHeaderTitle: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  timeframeButtons: {
     flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#111',
-    padding: 15,
-    borderRadius: 8,
+  },
+  timeframeButton: {
+    backgroundColor: '#333',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    marginLeft: 8,
+  },
+  selectedTimeframe: {
+    backgroundColor: '#DF0000',
+  },
+  timeframeText: {
+    color: '#999',
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  selectedTimeframeText: {
+    color: '#FFF',
+  },
+  detailedCardsContainer: {
+    marginTop: 10,
+  },
+  detailedCardsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 10,
   },
-  statusIcon: {
-    marginRight: 10,
+  detailedCard: {
+    backgroundColor: '#222',
+    borderRadius: 10,
+    padding: 15,
+    flex: 1,
+    marginHorizontal: 5,
   },
-  statusText: {
-    color: '#fff',
+  cardTitle: {
+    color: '#999',
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  cardValue: {
+    color: '#FFF',
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  averageContainer: {
+    flexDirection: 'column',
+  },
+  averageLabel: {
+    color: '#777',
+    fontSize: 12,
+  },
+  averageValue: {
+    color: '#999',
+    fontSize: 12,
   },
 });
