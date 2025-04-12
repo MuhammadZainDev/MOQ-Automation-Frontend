@@ -112,6 +112,18 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         if (hasRedirected.current) return;
         
         try {
+          // If user is null (logged out) and on a protected route, navigate to login
+          if (!user && !publicRoutes.includes(pathname)) {
+            console.log('ProtectedRoute - User logged out, redirecting to login');
+            hasRedirected.current = true;
+            
+            // Use setTimeout to ensure proper navigation
+            setTimeout(() => {
+              router.replace('/login');
+            }, 100);
+            return;
+          }
+          
           // If we're on a protected route, verify token validity
           if (!publicRoutes.includes(pathname)) {
             const tokenValid = await checkTokenExpiry();
@@ -153,9 +165,6 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
             } else {
               router.replace('/(tabs)');
             }
-          } else if (!user && !publicRoutes.includes(pathname)) {
-            hasRedirected.current = true;
-            router.replace('/login');
           }
         } catch (error) {
           console.log('ProtectedRoute - Route access error:', error);

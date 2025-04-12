@@ -244,10 +244,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         setTokenExpiryTimer(null);
       }
       
-      // Clear user state first to ensure UI updates immediately
-      setUser(null);
-      
-      // Then clear storage
+      // Then clear storage before updating UI state
       await authService.logout();
       
       console.log('Logout completed successfully');
@@ -259,45 +256,25 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         position: 'bottom'
       });
       
-      // Delay the navigation to ensure root layout is mounted
+      // Use a much longer delay (500ms) to ensure everything is cleared
+      // before attempting navigation
       setTimeout(() => {
-        // Use replace instead of navigate to avoid navigation stack issues
-        try {
-          router.replace('/login');
-        } catch (navError) {
-          console.error('Navigation error during logout:', navError);
-          // If immediate navigation fails, try again with a longer delay
-          setTimeout(() => {
-            try {
-              router.replace('/login');
-            } catch (finalError) {
-              console.error('Final navigation attempt failed:', finalError);
-            }
-          }, 500);
-        }
-      }, 100);
+        // Clear user state which will trigger ProtectedRoute to handle the navigation
+        setUser(null);
+        
+        // Let the ProtectedRoute component handle the redirection
+        // instead of using router.replace directly
+        console.log('User state cleared after logout');
+      }, 500);
     } catch (error: any) {
       console.error('Logout error:', error);
       
       // Even if there's an error, still clear the user state
-      setUser(null);
-      
-      // Delay navigation with the same pattern to avoid errors
+      // but with the same longer delay
       setTimeout(() => {
-        try {
-          router.replace('/login');
-        } catch (navError) {
-          console.error('Navigation error during error logout:', navError);
-          // If immediate navigation fails, try again with a longer delay
-          setTimeout(() => {
-            try {
-              router.replace('/login');
-            } catch (finalError) {
-              console.error('Final navigation attempt failed:', finalError);
-            }
-          }, 500);
-        }
-      }, 100);
+        setUser(null);
+        console.log('User state cleared after logout error');
+      }, 500);
       
       Toast.show({
         type: 'error',
