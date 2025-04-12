@@ -34,6 +34,11 @@ type UserAnalyticsData = {
   subscribers: number;
   posts: number;
   likes: number;
+  entries?: Array<{
+    stats: number;
+    created_at?: string;
+    [key: string]: any;
+  }>;
 };
 
 // Daily/Recent analytics data type
@@ -88,27 +93,137 @@ export default function HomeScreen() {
   // Mock data for monthly average bar chart
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
 
+  // Calculate monthly stats from analytics entries
+  const getMonthlyStats = () => {
+    // Don't filter by current year - just use the latest data for each month
+    const monthlyStats = Array(12).fill(0); // Initialize with zeros for all 12 months
+    const hasRealData = Array(12).fill(false); // Track which months have actual data
+    
+    // Check if we have entries with timestamps in the analytics data
+    if (analyticsData && analyticsData.entries && Array.isArray(analyticsData.entries)) {
+      console.log("Processing entries:", JSON.stringify(analyticsData.entries));
+      
+      // Process each entry and add to the corresponding month
+      analyticsData.entries.forEach(entry => {
+        console.log("Processing raw entry:", JSON.stringify(entry));
+        if (entry.created_at) {
+          // Get the month directly from the date string - most reliable method
+          // Format is "2025-03-12 20:26:19.65829+05"
+          try {
+            const dateStr = entry.created_at.toString();
+            console.log("Raw date string:", dateStr);
+            
+            // Extract month directly from the string using regex
+            const monthMatch = dateStr.match(/^\d{4}-(\d{2})-/);
+            if (monthMatch && monthMatch[1]) {
+              // Convert to zero-based month (JS months are 0-11)
+              const month = parseInt(monthMatch[1], 10) - 1;
+              
+              if (month >= 0 && month < 12) {
+                console.log(`Extracted month ${month} (${monthMatch[1]}) from date string, stats: ${entry.stats}`);
+                
+                monthlyStats[month] += Number(entry.stats || 0);
+                hasRealData[month] = true;
+              } else {
+                console.error("Invalid month extracted:", month, "from", dateStr);
+              }
+            } else {
+              console.error("Failed to extract month from date string:", dateStr);
+              
+              // Fallback to try parsing the whole date
+              try {
+                const entryDate = new Date(dateStr);
+                if (!isNaN(entryDate.getTime())) {
+                  const month = entryDate.getMonth();
+                  console.log(`Fallback: parsed date ${entryDate.toISOString()}, month: ${month}`);
+                  
+                  monthlyStats[month] += Number(entry.stats || 0);
+                  hasRealData[month] = true;
+                }
+              } catch (parseError) {
+                console.error("Error in fallback date parsing:", parseError);
+              }
+            }
+          } catch (error) {
+            console.error("Error processing entry date:", error);
+          }
+        }
+      });
+      
+      console.log("Monthly stats after processing:", JSON.stringify(monthlyStats));
+      console.log("Months with real data:", JSON.stringify(hasRealData));
+    } else {
+      // If no entries with timestamps, just set the current month to have the total stats
+      // and leave other months at zero or minimal values
+      const currentMonth = new Date().getMonth();
+      
+      // Set current month to have the actual stats value
+      monthlyStats[currentMonth] = analyticsData.stats || 0;
+      hasRealData[currentMonth] = true;
+      
+      // Set other months to have minimal value just for visualization (1-5% of the main value)
+      const minBarValue = Math.max(1, Math.floor((analyticsData.stats || 100) * 0.02));
+      for (let i = 0; i < 12; i++) {
+        if (i !== currentMonth) {
+          // Set display height value, but they don't have real data
+          monthlyStats[i] = minBarValue;
+          hasRealData[i] = false;
+        }
+      }
+    }
+    
+    return { monthlyStats, hasRealData };
+  };
+
   const getMonthlyBarData = () => {
     const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-    const values = [250, 500, 745, 370, 600, 350, 400, 520, 480, 650, 550, 700];
+    const { monthlyStats, hasRealData } = getMonthlyStats();
+    const currentMonth = new Date().getMonth();
     
-    return months.map((month, index) => ({
-      value: values[index],
-      label: month,
-      frontColor: index === selectedMonth ? '#FF4D4D' : 'rgba(255, 77, 77, 0.4)',
-      onPress: () => handleBarPress(index)
-    }));
+    // Find the max value for proper color contrast
+    const maxValue = Math.max(...monthlyStats);
+    const threshold = maxValue * 0.1; // 10% of max is considered "real data"
+    
+    return months.map((month, index) => {
+      // Determine if this month has significant data or just a placeholder value
+      const hasSignificantData = monthlyStats[index] > threshold && hasRealData[index];
+      
+      return {
+        value: monthlyStats[index], // Use this for the display height
+        label: month,
+        frontColor: 
+          index === selectedMonth ? '#FF4D4D' : // Selected month is bright red
+          hasRealData[index] ? 'rgba(255, 77, 77, 0.8)' : // Month with real data is semi-transparent red
+          'rgba(255, 77, 77, 0.2)', // Month with minimal/no data is very transparent
+        onPress: () => handleBarPress(index, monthlyStats[index], hasRealData[index])
+      };
+    });
   };
 
-  const handleBarPress = (monthIndex: number) => {
+  // Get the monthly stats data
+  const { monthlyStats, hasRealData } = getMonthlyStats();
+  // Find maximum monthly value for chart scaling
+  const maxMonthlyValue = Math.max(...monthlyStats, 1); // Ensure at least 1 to avoid division by zero
+  // Get bar data based on current analytics data
+  const barData = getMonthlyBarData();
+  // Track the selected month's value and if it has real data
+  const [selectedMonthValue, setSelectedMonthValue] = useState(monthlyStats[selectedMonth]);
+  const [selectedMonthHasData, setSelectedMonthHasData] = useState(hasRealData[selectedMonth]);
+
+  const handleBarPress = (monthIndex: number, monthValue: number, hasData: boolean) => {
     setSelectedMonth(monthIndex);
+    setSelectedMonthValue(monthValue);
+    setSelectedMonthHasData(hasData);
     // Update subscriber info based on selected month
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    console.log(`Selected month: ${months[monthIndex]}`);
+    console.log(`Selected month: ${months[monthIndex]}, Stats: ${hasData ? monthValue : 0}, Has data: ${hasData}`);
   };
 
-  const barData = getMonthlyBarData();
-  
+  // Function to check if a month has significant data
+  const hasSignificantData = (monthValue: number, hasData: boolean) => {
+    return hasData && monthValue > 0;
+  };
+
   // Mock data for yearly views line chart
   const lineData = [
     {value: 0},
@@ -139,6 +254,13 @@ export default function HomeScreen() {
     console.log('Updated today\'s analytics with real data:', totalData);
   };
   
+  // Update selectedMonthValue when analytics data changes
+  useEffect(() => {
+    const { monthlyStats, hasRealData } = getMonthlyStats();
+    setSelectedMonthValue(monthlyStats[selectedMonth]);
+    setSelectedMonthHasData(hasRealData[selectedMonth]);
+  }, [analyticsData, selectedMonth]);
+
   // Fetch user analytics data
   useEffect(() => {
     const fetchUserAnalytics = async () => {
@@ -208,11 +330,12 @@ export default function HomeScreen() {
     );
   }
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     console.log('Logout button pressed');
     try {
-        console.log('Calling logout function');
-        logout();
+      console.log('Calling logout function');
+      await logout();
+      // Don't navigate here - let the AuthContext handle it
     } catch (error) {
       console.error('Error during logout:', error);
       Alert.alert('Error', 'An error occurred during logout');
@@ -481,8 +604,12 @@ export default function HomeScreen() {
           <View style={[styles.chartContainer, {backgroundColor: '#212121'}]}>
             <View style={styles.redHeader}>
               <View style={styles.redHeaderTextContainer}>
-                <Text style={styles.redHeaderAmount}>$ 476</Text>
-                <Text style={styles.redHeaderText}>Monthly average</Text>
+                <Text style={styles.redHeaderAmount}>
+                  {formatNumber(selectedMonthHasData ? selectedMonthValue : 0)}
+                </Text>
+                <Text style={styles.redHeaderText}>
+                  {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]} Stats
+                </Text>
               </View>
               <TouchableOpacity style={styles.redHeaderMoreBtn} onPress={() => setShowChartOptions(!showChartOptions)}>
                 <Feather name="more-horizontal" size={24} color="#fff" />
@@ -492,14 +619,21 @@ export default function HomeScreen() {
             {/* Subscribers Info Box */}
             <View style={styles.subscriberInfoBox}>
               <View style={styles.subscriberInfoHeader}>
-                <Text style={styles.subscriberCount}>0</Text>
-                <Text style={styles.subscriberDate}>Jan 25<Text style={styles.superscript}>th</Text></Text>
+                <Text style={styles.subscriberCount}>
+                  {formatNumber(selectedMonthHasData ? selectedMonthValue : 0)}
+                </Text>
+                <Text style={styles.subscriberDate}>
+                  {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]} Stats
+                </Text>
                 <View style={styles.infoBadge}>
                   <Text style={styles.infoBadgeText}>i</Text>
                 </View>
               </View>
               <Text style={styles.subscriberMessage}>
-                In January, your subscribers remained relatively stable. Keep driving for growth!
+                {hasSignificantData(selectedMonthValue, selectedMonthHasData) 
+                  ? `Stats for ${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]} show ${formatNumber(selectedMonthValue)} engagements.`
+                  : `No stats available for ${['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}. Stats value: 0`
+                }
               </Text>
             </View>
             
@@ -537,7 +671,7 @@ export default function HomeScreen() {
                 yAxisThickness={0}
                 hideYAxisText
                 noOfSections={3}
-                maxValue={750}
+                maxValue={maxMonthlyValue * 1.2}
                 labelWidth={30}
                 xAxisLabelTextStyle={{color: '#ccc', textAlign: 'center'}}
                 hideOrigin

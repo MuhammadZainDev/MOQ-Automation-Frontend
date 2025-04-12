@@ -20,7 +20,7 @@ type AuthContextType = {
   error: string | null;
   login: (email: string, password: string) => Promise<{success: boolean, error?: string}>;
   signup: (name: string, email: string, password: string) => Promise<{success: boolean, error?: string}>;
-  logout: () => void;
+  logout: () => Promise<void>;
   checkTokenExpiry: () => Promise<boolean>;
 };
 
@@ -31,7 +31,7 @@ const AuthContext = createContext<AuthContextType>({
   error: null,
   login: async () => ({ success: false }),
   signup: async () => ({ success: false }),
-  logout: () => {},
+  logout: async () => {},
   checkTokenExpiry: async () => false,
 });
 
@@ -259,14 +259,45 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         position: 'bottom'
       });
       
-      // Force redirect to login after logout
-      router.replace('/login');
+      // Delay the navigation to ensure root layout is mounted
+      setTimeout(() => {
+        // Use replace instead of navigate to avoid navigation stack issues
+        try {
+          router.replace('/login');
+        } catch (navError) {
+          console.error('Navigation error during logout:', navError);
+          // If immediate navigation fails, try again with a longer delay
+          setTimeout(() => {
+            try {
+              router.replace('/login');
+            } catch (finalError) {
+              console.error('Final navigation attempt failed:', finalError);
+            }
+          }, 500);
+        }
+      }, 100);
     } catch (error: any) {
       console.error('Logout error:', error);
       
-      // Even if there's an error, still clear the user state and redirect
+      // Even if there's an error, still clear the user state
       setUser(null);
-      router.replace('/login');
+      
+      // Delay navigation with the same pattern to avoid errors
+      setTimeout(() => {
+        try {
+          router.replace('/login');
+        } catch (navError) {
+          console.error('Navigation error during error logout:', navError);
+          // If immediate navigation fails, try again with a longer delay
+          setTimeout(() => {
+            try {
+              router.replace('/login');
+            } catch (finalError) {
+              console.error('Final navigation attempt failed:', finalError);
+            }
+          }, 500);
+        }
+      }, 100);
       
       Toast.show({
         type: 'error',
