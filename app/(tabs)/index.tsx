@@ -112,17 +112,15 @@ export default function HomeScreen() {
     
     // Check if we have entries with timestamps in the analytics data
     if (analyticsData && analyticsData.entries && Array.isArray(analyticsData.entries)) {
-      console.log("Processing entries:", JSON.stringify(analyticsData.entries));
+      console.log(`Processing ${analyticsData.entries.length} entries for monthly stats`);
       
       // Process each entry and add to the corresponding month
       analyticsData.entries.forEach(entry => {
-        console.log("Processing raw entry:", JSON.stringify(entry));
         if (entry.created_at) {
           // Get the month directly from the date string - most reliable method
           // Format is "2025-03-12 20:26:19.65829+05"
           try {
             const dateStr = entry.created_at.toString();
-            console.log("Raw date string:", dateStr);
             
             // Extract month directly from the string using regex
             const monthMatch = dateStr.match(/^\d{4}-(\d{2})-/);
@@ -131,10 +129,10 @@ export default function HomeScreen() {
               const month = parseInt(monthMatch[1], 10) - 1;
               
               if (month >= 0 && month < 12) {
-                console.log(`Extracted month ${month} (${monthMatch[1]}) from date string, stats: ${entry.stats}`);
-                
-                monthlyStats[month] += Number(entry.stats || 0);
+                const statValue = Number(entry.stats || 0);
+                monthlyStats[month] += statValue;
                 hasRealData[month] = true;
+                console.log(`Added ${statValue} to month ${month+1} (${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month]}), new total: ${monthlyStats[month]}`);
               } else {
                 console.error("Invalid month extracted:", month, "from", dateStr);
               }
@@ -146,10 +144,10 @@ export default function HomeScreen() {
                 const entryDate = new Date(dateStr);
                 if (!isNaN(entryDate.getTime())) {
                   const month = entryDate.getMonth();
-                  console.log(`Fallback: parsed date ${entryDate.toISOString()}, month: ${month}`);
-                  
-                  monthlyStats[month] += Number(entry.stats || 0);
+                  const statValue = Number(entry.stats || 0);
+                  monthlyStats[month] += statValue;
                   hasRealData[month] = true;
+                  console.log(`Fallback: Added ${statValue} to month ${month+1}, new total: ${monthlyStats[month]}`);
                 }
               } catch (parseError) {
                 console.error("Error in fallback date parsing:", parseError);
@@ -171,6 +169,7 @@ export default function HomeScreen() {
       // Set current month to have the actual stats value
       monthlyStats[currentMonth] = analyticsData.stats || 0;
       hasRealData[currentMonth] = true;
+      console.log(`No entries with timestamps, setting current month ${currentMonth+1} to total stats: ${monthlyStats[currentMonth]}`);
       
       // Set other months to have minimal value just for visualization (1-5% of the main value)
       const minBarValue = Math.max(1, Math.floor((analyticsData.stats || 100) * 0.02));
@@ -191,6 +190,7 @@ export default function HomeScreen() {
     const { monthlyStats, hasRealData } = getMonthlyStats();
     setSelectedMonthValue(monthlyStats[selectedMonth]);
     setSelectedMonthHasData(hasRealData[selectedMonth]);
+    console.log(`Selected month ${selectedMonth+1} value updated to: ${monthlyStats[selectedMonth]}`);
   }, [analyticsData, selectedMonth, getMonthlyStats]);
   
   // Handler for bar press is now a constant function (not dependent on conditions)
@@ -200,7 +200,7 @@ export default function HomeScreen() {
     setSelectedMonthHasData(hasData);
     // Update subscriber info based on selected month
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    console.log(`Selected month: ${months[monthIndex]}, Stats: ${hasData ? monthValue : 0}, Has data: ${hasData}`);
+    console.log(`Selected month bar: ${months[monthIndex]}, Stats total: ${hasData ? monthValue : 0}, Has data: ${hasData}`);
   }, []);
 
   // Function to check if a month has significant data
@@ -210,7 +210,7 @@ export default function HomeScreen() {
 
   // Get bar data based on current analytics data
   const getMonthlyBarData = useCallback(() => {
-    const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const { monthlyStats, hasRealData } = getMonthlyStats();
     const currentMonth = new Date().getMonth();
     
@@ -716,7 +716,7 @@ export default function HomeScreen() {
                   ${formatNumber(selectedMonthHasData ? selectedMonthValue : 0)}
                 </Text>
                 <Text style={styles.redHeaderText}>
-                  Revenue Generated
+                  {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]} Total Stats
                 </Text>
               </View>
               <TouchableOpacity style={styles.redHeaderMoreBtn} onPress={() => setShowChartOptions(!showChartOptions)}>
@@ -728,12 +728,12 @@ export default function HomeScreen() {
             <View style={styles.notificationContainer}>
               <View style={styles.notificationHeader}>
                 <Text style={styles.dateText}>
-                  {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][selectedMonth]} {new Date().getDate()}'
-              </Text>
-            </View>
+                  Monthly Summary for {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}
+                </Text>
+              </View>
               <View style={styles.notificationContent}>
                 <Text style={styles.notificationText}>
-                  In {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}, your <Text style={styles.blueText}>revenue</Text> 
+                  In {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}, your <Text style={styles.blueText}>total stats</Text> 
                   {(() => {
                     // Calculate previous month's index (with wraparound to December if current is January)
                     const prevMonthIndex = selectedMonth > 0 ? selectedMonth - 1 : 11;
@@ -748,8 +748,11 @@ export default function HomeScreen() {
                       const prevMonthEntries = analyticsData.entries.filter(entry => {
                         if (entry.created_at) {
                           try {
-                            const entryDate = new Date(entry.created_at);
-                            return entryDate.getMonth() === prevMonthIndex;
+                            const dateStr = entry.created_at.toString();
+                            const prevMonthStr = prevMonthIndex < 9 
+                              ? `-0${prevMonthIndex + 1}-` 
+                              : `-${prevMonthIndex + 1}-`;
+                            return dateStr.includes(prevMonthStr);
                           } catch (e) {
                             return false;
                           }
