@@ -118,7 +118,8 @@ export const adminService = {
           views: '',
           videos: '',
           watch_hours: '',
-          premium_country_views: ''
+          premium_country_views: '',
+          subscribers: ''
         }
       };
     }
@@ -183,6 +184,7 @@ export const adminService = {
             videos: enhancedData.data.videos || 0,
             watch_hours: enhancedData.data.watch_hours || 0,
             premium_country_views: enhancedData.data.premium_country_views || 0,
+            subscribers: enhancedData.data.subscribers || 0,
             created_at: isoDate
           }];
           
@@ -213,6 +215,7 @@ export const adminService = {
             videos: 5,
             watch_hours: 25,
             premium_country_views: 10,
+            subscribers: 10,
             created_at: new Date().toISOString()
           }]
         }

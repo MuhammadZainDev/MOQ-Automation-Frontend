@@ -249,6 +249,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       
       console.log('Logout completed successfully');
       
+      // Clear user state immediately - don't use setTimeout which can cause issues
+      setUser(null);
+      
       Toast.show({
         type: 'info',
         text1: 'Logged Out',
@@ -256,25 +259,23 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         position: 'bottom'
       });
       
-      // Use a much longer delay (500ms) to ensure everything is cleared
-      // before attempting navigation
+      // Explicitly navigate to login page
       setTimeout(() => {
-        // Clear user state which will trigger ProtectedRoute to handle the navigation
-        setUser(null);
-        
-        // Let the ProtectedRoute component handle the redirection
-        // instead of using router.replace directly
-        console.log('User state cleared after logout');
-      }, 500);
+        router.replace('/login' as any);
+      }, 100);
+      
+      // The ProtectedRoute component will handle the redirection
+      console.log('User state cleared after logout');
     } catch (error: any) {
       console.error('Logout error:', error);
       
-      // Even if there's an error, still clear the user state
-      // but with the same longer delay
+      // Even if there's an error, still clear the user state immediately
+      setUser(null);
+      
+      // Also redirect to login page after error
       setTimeout(() => {
-        setUser(null);
-        console.log('User state cleared after logout error');
-      }, 500);
+        router.replace('/login' as any);
+      }, 100);
       
       Toast.show({
         type: 'error',

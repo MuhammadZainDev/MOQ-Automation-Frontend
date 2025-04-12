@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -97,8 +97,15 @@ export default function HomeScreen() {
   // Mock data for monthly average bar chart
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
 
+  // Add state for options menu
+  const [showChartOptions, setShowChartOptions] = useState(false);
+  
+  // Move these states before any conditional returns
+  const [selectedMonthValue, setSelectedMonthValue] = useState(0);
+  const [selectedMonthHasData, setSelectedMonthHasData] = useState(false);
+
   // Calculate monthly stats from analytics entries
-  const getMonthlyStats = () => {
+  const getMonthlyStats = useCallback(() => {
     // Don't filter by current year - just use the latest data for each month
     const monthlyStats = Array(12).fill(0); // Initialize with zeros for all 12 months
     const hasRealData = Array(12).fill(false); // Track which months have actual data
@@ -177,9 +184,32 @@ export default function HomeScreen() {
     }
     
     return { monthlyStats, hasRealData };
-  };
+  }, [analyticsData]);
+  
+  // Get the monthly stats data - moved inside useEffect to avoid hooks ordering issues
+  useEffect(() => {
+    const { monthlyStats, hasRealData } = getMonthlyStats();
+    setSelectedMonthValue(monthlyStats[selectedMonth]);
+    setSelectedMonthHasData(hasRealData[selectedMonth]);
+  }, [analyticsData, selectedMonth, getMonthlyStats]);
+  
+  // Handler for bar press is now a constant function (not dependent on conditions)
+  const handleBarPress = useCallback((monthIndex: number, monthValue: number, hasData: boolean) => {
+    setSelectedMonth(monthIndex);
+    setSelectedMonthValue(monthValue);
+    setSelectedMonthHasData(hasData);
+    // Update subscriber info based on selected month
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    console.log(`Selected month: ${months[monthIndex]}, Stats: ${hasData ? monthValue : 0}, Has data: ${hasData}`);
+  }, []);
 
-  const getMonthlyBarData = () => {
+  // Function to check if a month has significant data
+  const hasSignificantData = useCallback((monthValue: number, hasData: boolean) => {
+    return hasData && monthValue > 0;
+  }, []);
+
+  // Get bar data based on current analytics data
+  const getMonthlyBarData = useCallback(() => {
     const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
     const { monthlyStats, hasRealData } = getMonthlyStats();
     const currentMonth = new Date().getMonth();
@@ -202,51 +232,16 @@ export default function HomeScreen() {
         onPress: () => handleBarPress(index, monthlyStats[index], hasRealData[index])
       };
     });
-  };
+  }, [getMonthlyStats, selectedMonth, handleBarPress]);
 
-  // Get the monthly stats data
-  const { monthlyStats, hasRealData } = getMonthlyStats();
-  // Find maximum monthly value for chart scaling
-  const maxMonthlyValue = Math.max(...monthlyStats, 1); // Ensure at least 1 to avoid division by zero
-  // Get bar data based on current analytics data
-  const barData = getMonthlyBarData();
-  // Track the selected month's value and if it has real data
-  const [selectedMonthValue, setSelectedMonthValue] = useState(monthlyStats[selectedMonth]);
-  const [selectedMonthHasData, setSelectedMonthHasData] = useState(hasRealData[selectedMonth]);
+  // Calculate maxMonthlyValue based on monthlyStats
+  const maxMonthlyValue = useMemo(() => {
+    const { monthlyStats } = getMonthlyStats();
+    return Math.max(...monthlyStats, 1); // Ensure at least 1 to avoid division by zero
+  }, [getMonthlyStats]);
 
-  const handleBarPress = (monthIndex: number, monthValue: number, hasData: boolean) => {
-    setSelectedMonth(monthIndex);
-    setSelectedMonthValue(monthValue);
-    setSelectedMonthHasData(hasData);
-    // Update subscriber info based on selected month
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    console.log(`Selected month: ${months[monthIndex]}, Stats: ${hasData ? monthValue : 0}, Has data: ${hasData}`);
-  };
-
-  // Function to check if a month has significant data
-  const hasSignificantData = (monthValue: number, hasData: boolean) => {
-    return hasData && monthValue > 0;
-  };
-
-  // Mock data for yearly views line chart
-  const lineData = [
-    {value: 0},
-    {value: 20},
-    {value: 18},
-    {value: 40},
-    {value: 36},
-    {value: 60},
-    {value: 54},
-    {value: 85},
-    {value: 78},
-    {value: 105},
-  ];
-  
-  // Debug user info
-  console.log('Home Screen - Current User:', user?.name, user?.role);
-  
-  // Update today's analytics with actual data
-  const updateTodaysAnalytics = (totalData: UserAnalyticsData) => {
+  // Update today's analytics with actual data - converted to useCallback
+  const updateTodaysAnalytics = useCallback((totalData: UserAnalyticsData) => {
     // Instead of using total data, we need to filter for today's entries only
     let todayStats = 0;
     let todayViews = 0;
@@ -279,7 +274,7 @@ export default function HomeScreen() {
           todayStats += Number(entry.stats || 0);
           todayViews += Number(entry.views || 0);
           todayVideos += Number(entry.videos || 0);
-          todaySubscribers += Number(entry.premium_country_views || 0); // Using premium_country_views as subscribers
+          todaySubscribers += Number(entry.subscribers || 0); // Use actual subscribers field
           todayWatchHours += Number(entry.watch_hours || 0);
           todayLikes += Number(entry.stats || 0); // Using stats as likes
         });
@@ -297,7 +292,7 @@ export default function HomeScreen() {
           todayStats = Number(mostRecent.stats || 0);
           todayViews = Number(mostRecent.views || 0);
           todayVideos = Number(mostRecent.videos || 0);
-          todaySubscribers = Number(mostRecent.premium_country_views || 0);
+          todaySubscribers = Number(mostRecent.subscribers || 0); // Use actual subscribers field
           todayWatchHours = Number(mostRecent.watch_hours || 0);
           todayLikes = Number(mostRecent.stats || 0); // Using stats as likes
         }
@@ -331,15 +326,8 @@ export default function HomeScreen() {
       watch_hours: todayWatchHours,
       likes: todayLikes
     });
-  };
+  }, []);
   
-  // Update selectedMonthValue when analytics data changes
-  useEffect(() => {
-    const { monthlyStats, hasRealData } = getMonthlyStats();
-    setSelectedMonthValue(monthlyStats[selectedMonth]);
-    setSelectedMonthHasData(hasRealData[selectedMonth]);
-  }, [analyticsData, selectedMonth]);
-
   // Fetch user analytics data
   useEffect(() => {
     const fetchUserAnalytics = async () => {
@@ -368,7 +356,36 @@ export default function HomeScreen() {
     };
     
     fetchUserAnalytics();
-  }, [user]);
+  }, [user, updateTodaysAnalytics]);
+  
+  // Refresh all analytics data
+  const refreshData = useCallback(() => {
+    setIsLoadingAnalytics(true);
+    adminService.getCurrentUserAnalytics()
+      .then(response => {
+        if (response.success && response.data) {
+          setAnalyticsData(response.data);
+          
+          // Update today's analytics with real data
+          updateTodaysAnalytics(response.data);
+        }
+      })
+      .catch(error => console.error('Error refreshing analytics:', error))
+      .finally(() => setIsLoadingAnalytics(false));
+  }, [updateTodaysAnalytics]);
+
+  // Handle logout safely
+  const handleLogout = useCallback(async () => {
+    console.log('Logout button pressed');
+    try {
+      console.log('Calling logout function');
+      await logout();
+      // Don't navigate here - let the AuthContext handle it
+    } catch (error) {
+      console.error('Error during logout:', error);
+      Alert.alert('Error', 'An error occurred during logout');
+    }
+  }, [logout]);
   
   // Calculate detailed analytics based on the fetched data
   const detailedAnalytics = {
@@ -389,141 +406,18 @@ export default function HomeScreen() {
     }
   };
 
-  // If still checking authentication, show loading indicator
-  if (isLoading) {
+  // Remove early returns and use conditional rendering instead
     return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#000" />
+      {isLoading ? (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#DF0000" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
-    );
-  }
-
-  // If no user is found after loading completes, redirect to login
-  if (!user) {
-    console.log('Home Screen - No user found, user object is null or undefined');
-    return (
+      ) : !user ? (
       <View style={styles.loadingContainer}>
         <Text style={styles.message}>Not logged in</Text>
-      </View>
-    );
-  }
-
-  const handleLogout = async () => {
-    console.log('Logout button pressed');
-    try {
-      console.log('Calling logout function');
-      await logout();
-      // Don't navigate here - let the AuthContext handle it
-    } catch (error) {
-      console.error('Error during logout:', error);
-      Alert.alert('Error', 'An error occurred during logout');
-    }
-  };
-  
-  // Refresh all analytics data
-  const refreshData = () => {
-    setIsLoadingAnalytics(true);
-    adminService.getCurrentUserAnalytics()
-      .then(response => {
-        if (response.success && response.data) {
-          setAnalyticsData(response.data);
-          
-          // Update today's analytics with real data
-          updateTodaysAnalytics(response.data);
-        }
-      })
-      .catch(error => console.error('Error refreshing analytics:', error))
-      .finally(() => setIsLoadingAnalytics(false));
-  };
-
-  // Add state for options menu
-  const [showChartOptions, setShowChartOptions] = useState(false);
-
-  // Function to get monthly views data
-  const getMonthlyViewsData = () => {
-    const monthlyViews = Array(12).fill(0); // Initialize with zeros for all 12 months
-    
-    // Check if we have entries with timestamps in the analytics data
-    if (analyticsData && analyticsData.entries && Array.isArray(analyticsData.entries)) {
-      // Process each entry and add to the corresponding month
-      analyticsData.entries.forEach(entry => {
-        if (entry.created_at) {
-          try {
-            const dateStr = entry.created_at.toString();
-            
-            // Extract month directly from the string using regex
-            const monthMatch = dateStr.match(/^\d{4}-(\d{2})-/);
-            if (monthMatch && monthMatch[1]) {
-              // Convert to zero-based month (JS months are 0-11)
-              const month = parseInt(monthMatch[1], 10) - 1;
-              
-              if (month >= 0 && month < 12) {
-                // Use views field instead of stats
-                monthlyViews[month] += Number(entry.views || 0);
-              }
-            } else {
-              // Fallback to try parsing the whole date
-              try {
-                const entryDate = new Date(dateStr);
-                if (!isNaN(entryDate.getTime())) {
-                  const month = entryDate.getMonth();
-                  monthlyViews[month] += Number(entry.views || 0);
-                }
-              } catch (parseError) {
-                console.error("Error in fallback date parsing for views:", parseError);
-              }
-            }
-          } catch (error) {
-            console.error("Error processing entry date for views:", error);
-          }
-        }
-      });
-    } else {
-      // If no entries with timestamps, create some placeholder data
-      const currentMonth = new Date().getMonth();
-      
-      // Set current month to have the actual views value
-      monthlyViews[currentMonth] = analyticsData.views || 0;
-      
-      // Set other months to have some values for visualization
-      const baseValue = Math.max(10, Math.floor((analyticsData.views || 100) * 0.1));
-      for (let i = 0; i < 12; i++) {
-        if (i !== currentMonth) {
-          // Generate a random value between 50-150% of the base value
-          monthlyViews[i] = Math.round(baseValue * (0.5 + Math.random()));
-        }
-      }
-    }
-    
-    return monthlyViews;
-  };
-  
-  // Function to generate bar data for views chart
-  const getViewsBarData = () => {
-    const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
-    const monthlyViews = getMonthlyViewsData();
-    
-    return months.map((month, index) => {
-      return {
-        value: monthlyViews[index], // Use this for the display height
-        label: month,
-        frontColor: 
-          index === selectedMonth ? '#FF4D4D' : // Selected month is bright red (same as stats graph)
-          monthlyViews[index] > 0 ? 'rgba(255, 77, 77, 0.8)' : // Month with data is semi-transparent red
-          'rgba(255, 77, 77, 0.2)', // Month with minimal/no data is very transparent red
-        onPress: () => handleBarPress(index, monthlyViews[index], monthlyViews[index] > 0)
-      };
-    });
-  };
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
-      {isLoading ? (
-        <View style={styles.fullLoadingContainer}>
-          <ActivityIndicator size="large" color="#DF0000" />
-          <Text style={styles.loadingText}>Loading dashboard...</Text>
         </View>
       ) : (
       <ScrollView style={styles.container}>
@@ -763,9 +657,9 @@ export default function HomeScreen() {
                         <Text style={styles.averageLabel}>Average</Text>
                         <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.subscribers || 0) / 28))} / day</Text>
                       </View>
+                      </View>
                     </View>
-                  </View>
-                  
+                    
                   <View style={styles.detailedCardsRow}>
                     {/* Views Card */}
                     <View style={styles.detailedCard}>
@@ -784,10 +678,10 @@ export default function HomeScreen() {
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
                         <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.videos || 0) / 28))} / day</Text>
-                      </View>
-                    </View>
-                  </View>
-                  
+            </View>
+          </View>
+        </View>
+        
                   <View style={styles.detailedCardsRow}>
                     {/* Watch Hours Card */}
                     <View style={styles.detailedCard}>
@@ -835,8 +729,8 @@ export default function HomeScreen() {
               <View style={styles.notificationHeader}>
                 <Text style={styles.dateText}>
                   {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][selectedMonth]} {new Date().getDate()}'
-                </Text>
-              </View>
+              </Text>
+            </View>
               <View style={styles.notificationContent}>
                 <Text style={styles.notificationText}>
                   In {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}, your <Text style={styles.blueText}>revenue</Text> 
@@ -915,7 +809,7 @@ export default function HomeScreen() {
             
             <View style={styles.chartWrapper}>
               <BarChart
-                data={barData}
+                data={getMonthlyBarData()}
                 width={screenWidth - 80}
                 height={220}
                 barWidth={30}
@@ -934,12 +828,13 @@ export default function HomeScreen() {
             </View>
           </View>
           
-          {/* Monthly Views Chart */}
+          {/* Monthly Views Chart - Temporarily disabled due to missing functions */}
+          {/* 
           <View style={[styles.chartContainer, {backgroundColor: '#212121'}]}>
             <View style={styles.redHeader}>
               <View style={styles.redHeaderTextContainer}>
                 <Text style={styles.redHeaderAmount}>
-                  {formatNumber(selectedMonthHasData ? getMonthlyViewsData()[selectedMonth] : 0)}
+                  {formatNumber(selectedMonthHasData ? 0 : 0)}
                 </Text>
                 <Text style={styles.redHeaderText}>
                   Views Generated
@@ -950,7 +845,6 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             
-            {/* Screenshot-style notification for views */}
             <View style={styles.notificationContainer}>
               <View style={styles.notificationHeader}>
                 <Text style={styles.dateText}>
@@ -959,63 +853,44 @@ export default function HomeScreen() {
               </View>
               <View style={styles.notificationContent}>
                 <Text style={styles.notificationText}>
-                  In {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}, your <Text style={styles.blueText}>views</Text> 
-                  {(() => {
-                    // Calculate previous month's index (with wraparound to December if current is January)
-                    const prevMonthIndex = selectedMonth > 0 ? selectedMonth - 1 : 11;
-                    
-                    // Get monthly views data
-                    const monthlyViewsData = getMonthlyViewsData();
-                    
-                    // Get current and previous month values
-                    const currentMonthValue = selectedMonthHasData ? monthlyViewsData[selectedMonth] : 0;
-                    const prevMonthValue = monthlyViewsData[prevMonthIndex] || 0;
-                    
-                    // Calculate difference
-                    const difference = currentMonthValue - prevMonthValue;
-                    const percentChange = prevMonthValue > 0 ? Math.round((difference / prevMonthValue) * 100) : 0;
-                    
-                    // Return appropriate message based on change
-                    if (difference > 0) {
-                      return (
-                        <> increased by <Text style={styles.greenText}>{formatNumber(difference)}</Text> ({percentChange}%). Great engagement!</>
-                      );
-                    } else if (difference < 0) {
-                      return (
-                        <> decreased by <Text style={styles.redText}>{formatNumber(Math.abs(difference))}</Text> ({Math.abs(percentChange)}%). Need a new content strategy.</> 
-                      );
-                    } else {
-                      return (
-                        <> remained the same as last month. Consider new content formats.</>
-                      );
-                    }
-                  })()}
+                  Monthly views data unavailable.
                 </Text>
               </View>
             </View>
+          </View>
+          */}
+          
+          {/* Subscribers Chart - Temporarily disabled due to missing functions */}
+          {/*
+          <View style={[styles.chartContainer, {backgroundColor: '#212121'}]}>
+            <View style={styles.redHeader}>
+              <View style={styles.redHeaderTextContainer}>
+                <Text style={styles.redHeaderAmount}>
+                  {formatNumber(selectedMonthHasData ? 0 : 0)}
+                </Text>
+                <Text style={styles.redHeaderText}>
+                  Subscribers
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.redHeaderMoreBtn} onPress={() => setShowChartOptions(!showChartOptions)}>
+                <Feather name="more-horizontal" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
             
-            <View style={styles.chartWrapper}>
-              <BarChart
-                data={getViewsBarData()}
-                width={screenWidth - 80}
-                height={220}
-                barWidth={30}
-                spacing={18}
-                barBorderRadius={4}
-                hideRules
-                xAxisThickness={0}
-                yAxisThickness={0}
-                hideYAxisText
-                noOfSections={3}
-                maxValue={Math.max(...getMonthlyViewsData()) * 1.2}
-                labelWidth={30}
-                xAxisLabelTextStyle={{color: '#ccc', textAlign: 'center'}}
-                hideOrigin
-              />
+            <View style={styles.notificationContainer}>
+              <View style={styles.notificationHeader}>
+                <Text style={styles.dateText}>
+                  {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][selectedMonth]} {new Date().getDate()}'
+                </Text>
+              </View>
+              <View style={styles.notificationContent}>
+                <Text style={styles.notificationText}>
+                  Monthly subscribers data unavailable.
+                </Text>
+              </View>
             </View>
           </View>
-          
-          {/* Yearly Views Chart removed */}
+          */}
       </ScrollView>
       )}
     </SafeAreaView>

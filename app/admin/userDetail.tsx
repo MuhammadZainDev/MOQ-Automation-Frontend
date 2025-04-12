@@ -50,15 +50,18 @@ type UserAnalytics = {
   videos: number;
   watch_hours: number;
   premium_country_views: number;
+  subscribers?: number;
   entries?: any[];
 };
 
 // Custom layout component without the header for this page
 function CustomLayout({ children }: { children: React.ReactNode }) {
   const { logout } = useAuth();
+  const router = useRouter();
   
   const handleLogout = async () => {
     await logout();
+    // Navigation is now handled inside the logout method
   };
   
   return (
@@ -98,6 +101,7 @@ export default function UserDetailScreen() {
   const [videos, setVideos] = useState('');
   const [watchHours, setWatchHours] = useState('');
   const [premiumCountryViews, setPremiumCountryViews] = useState('');
+  const [subscribers, setSubscribers] = useState('');
   const [savingAnalytics, setSavingAnalytics] = useState(false);
 
   // Fetch user details and analytics
@@ -141,6 +145,7 @@ export default function UserDetailScreen() {
             setVideos('');
             setWatchHours('');
             setPremiumCountryViews('');
+            setSubscribers('');
           }
         } catch (analyticsError) {
           console.log('Analytics not available yet, using default values');
@@ -178,7 +183,8 @@ export default function UserDetailScreen() {
         views: !isNaN(Number(views)) ? Number(views) : 0,
         videos: !isNaN(Number(videos)) ? Number(videos) : 0,
         watch_hours: !isNaN(Number(watchHours)) ? Number(watchHours) : 0,
-        premium_country_views: !isNaN(Number(premiumCountryViews)) ? Number(premiumCountryViews) : 0
+        premium_country_views: !isNaN(Number(premiumCountryViews)) ? Number(premiumCountryViews) : 0,
+        subscribers: !isNaN(Number(subscribers)) ? Number(subscribers) : 0
       };
       
       // Update user analytics
@@ -191,6 +197,7 @@ export default function UserDetailScreen() {
         setVideos('');
         setWatchHours('');
         setPremiumCountryViews('');
+        setSubscribers('');
         
         // Show success message
         Toast.show({
@@ -328,15 +335,20 @@ export default function UserDetailScreen() {
               </View>
             </View>
             
-            <View style={styles.boxesRowCenter}>
-              <View style={styles.widerAnalyticsBox}>
+            <View style={styles.boxesRow}>
+              <View style={styles.analyticsBox}>
                 <Text style={styles.boxLabel}>Watch Hours</Text>
                 <Text style={styles.boxValue}>{formatNumber(user?.analytics?.watch_hours || 0)}</Text>
               </View>
               
-              <View style={styles.widerAnalyticsBox}>
+              <View style={styles.analyticsBox}>
                 <Text style={styles.boxLabel}>Premium Views</Text>
                 <Text style={styles.boxValue}>{formatNumber(user?.analytics?.premium_country_views || 0)}</Text>
+              </View>
+              
+              <View style={styles.analyticsBox}>
+                <Text style={styles.boxLabel}>Subscribers</Text>
+                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.subscribers || 0)}</Text>
               </View>
             </View>
           </View>
@@ -407,12 +419,27 @@ export default function UserDetailScreen() {
             </View>
           </View>
           
+          {/* Subscribers on its own line with full width */}
+          <Text style={styles.label}>Subscribers</Text>
+          <View style={styles.inputContainer}>
+            <Ionicons name="people-outline" size={22} color="#777" style={styles.inputIcon} />
+            <TextInput 
+              style={styles.input} 
+              placeholder="Enter new subscribers to add" 
+              placeholderTextColor="#777"
+              value={subscribers}
+              onChangeText={setSubscribers}
+              keyboardType="numeric"
+            />
+          </View>
+          
+          {/* Premium Country Views on its own line with full width */}
           <Text style={styles.label}>Premium Country Views</Text>
           <View style={styles.inputContainer}>
             <Ionicons name="globe-outline" size={22} color="#777" style={styles.inputIcon} />
             <TextInput 
               style={styles.input} 
-              placeholder="Enter new premium country views to add" 
+              placeholder="Enter new premium views to add" 
               placeholderTextColor="#777"
               value={premiumCountryViews}
               onChangeText={setPremiumCountryViews}

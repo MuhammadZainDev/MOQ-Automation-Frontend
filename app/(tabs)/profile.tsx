@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
+import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const { user, logout } = useAuth();
@@ -11,6 +12,7 @@ export default function ProfileScreen() {
     setLoggingOut(true);
     try {
       await logout();
+      // Navigation is handled in the AuthContext
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
