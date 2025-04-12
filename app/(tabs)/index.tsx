@@ -14,6 +14,27 @@ import {
 import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
+import { adminService } from '../../src/services/adminApi';
+
+// Define analytics type
+type UserAnalyticsData = {
+  stats: number;
+  views: number;
+  videos: number;
+  watch_hours: number;
+  premium_country_views: number;
+  subscribers: number;
+  posts: number;
+  likes: number;
+};
+
+// Daily/Recent analytics data type
+type DailyAnalyticsData = {
+  stats: number;
+  views: number;
+  videos: number;
+  subscribers: number;
+};
 
 // Utility function to format numbers in a human-readable way (1k, 1.2M, etc)
 const formatNumber = (num: number): string => {
@@ -36,36 +57,91 @@ const formatNumber = (num: number): string => {
 export default function HomeScreen() {
   const { user, isLoading, logout } = useAuth();
   const [selectedTimeframe, setSelectedTimeframe] = useState('280');
-
-  // Debugging - add console logs
-  console.log('Home Screen - isLoading:', isLoading);
-  console.log('Home Screen - Current User:', user);
-  console.log('Home Screen - Logout Function:', logout ? 'Available' : 'Not Available');
-
-  // Mock analytics data - would come from the API in a real implementation
-  const userAnalytics = {
-    stats: 2500,
-    subs: 1,
+  const [analyticsData, setAnalyticsData] = useState<UserAnalyticsData>({
+    stats: 0,
     views: 0,
-    videos: 0
-  };
+    videos: 0,
+    watch_hours: 0,
+    premium_country_views: 0,
+    subscribers: 0,
+    posts: 0,
+    likes: 0
+  });
+  // Store daily analytics separately
+  const [dailyAnalyticsData, setDailyAnalyticsData] = useState<DailyAnalyticsData>({
+    stats: 0,
+    views: 0,
+    videos: 0,
+    subscribers: 0
+  });
+  const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
+  const [todayRefreshCount, setTodayRefreshCount] = useState(0);
 
-  // Mock detailed analytics
+  // Debug user info
+  console.log('Home Screen - Current User:', user?.name, user?.role);
+  
+  // Update today's analytics with actual data
+  const updateTodaysAnalytics = (totalData: UserAnalyticsData) => {
+    // Use real data from backend
+    setDailyAnalyticsData({
+      stats: totalData.stats || 0,
+      views: totalData.views || 0,
+      videos: totalData.videos || 0,
+      subscribers: totalData.subscribers || 0
+    });
+    
+    // Increment refresh counter when we get new data
+    setTodayRefreshCount(prev => prev + 1);
+    
+    console.log('Updated today\'s analytics with real data:', totalData);
+  };
+  
+  // Fetch user analytics data
+  useEffect(() => {
+    const fetchUserAnalytics = async () => {
+      if (!user) return;
+      
+      try {
+        setIsLoadingAnalytics(true);
+        
+        // Get total analytics from API
+        const response = await adminService.getCurrentUserAnalytics();
+        
+        if (response.success && response.data) {
+          console.log('Successfully fetched analytics data:', response.data);
+          setAnalyticsData(response.data);
+          
+          // Update today's analytics with real data from API
+          updateTodaysAnalytics(response.data);
+        } else {
+          console.error('Error in analytics response:', response);
+        }
+      } catch (error) {
+        console.error('Failed to fetch analytics data:', error);
+      } finally {
+        setIsLoadingAnalytics(false);
+      }
+    };
+    
+    fetchUserAnalytics();
+  }, [user]);
+  
+  // Calculate detailed analytics based on the fetched data
   const detailedAnalytics = {
     subscribers: {
-      value: 0,
-      average: 0,
-      trend: 'down'
+      value: analyticsData.subscribers || 0,
+      average: ((analyticsData.subscribers || 0) / 28).toFixed(1),
+      trend: 'neutral'
     },
     views: {
-      value: 7,
-      average: 1.8,
-      trend: 'down'
+      value: analyticsData.views || 0,
+      average: ((analyticsData.views || 0) / 28).toFixed(1),
+      trend: 'neutral'
     },
     watchHours: {
-      value: 0,
-      average: 0,
-      trend: 'down'
+      value: analyticsData.watch_hours || 0,
+      average: ((analyticsData.watch_hours || 0) / 28).toFixed(1),
+      trend: 'neutral'
     }
   };
 
@@ -89,14 +165,6 @@ export default function HomeScreen() {
     );
   }
 
-  // User is available, log detailed info
-  console.log('Home Screen - User found:', {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    role: user.role
-  });
-
   const handleLogout = () => {
     console.log('Logout button pressed');
     try {
@@ -107,148 +175,265 @@ export default function HomeScreen() {
       Alert.alert('Error', 'An error occurred during logout');
     }
   };
+  
+  // Refresh all analytics data
+  const refreshData = () => {
+    setIsLoadingAnalytics(true);
+    adminService.getCurrentUserAnalytics()
+      .then(response => {
+        if (response.success && response.data) {
+          setAnalyticsData(response.data);
+          
+          // Update today's analytics with real data
+          updateTodaysAnalytics(response.data);
+        }
+      })
+      .catch(error => console.error('Error refreshing analytics:', error))
+      .finally(() => setIsLoadingAnalytics(false));
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
-      <ScrollView style={styles.container}>
-        {/* Channel Header Section */}
-        <View style={styles.channelHeader}>
-          <View style={styles.channelInfo}>
-            <View style={styles.logoContainer}>
-              <Image 
-                source={require('../../assets/logo/logo.jpg')} 
-                style={styles.logo}
-                resizeMode="contain"
-              />
-            </View>
-            
-            <View style={styles.channelTextInfo}>
-              <Text style={styles.channelName}>{user.name}</Text>
-              <Text style={styles.lastUpdate}>3 days ago</Text>
-          </View>
+      {isLoading ? (
+        <View style={styles.fullLoadingContainer}>
+          <ActivityIndicator size="large" color="#DF0000" />
+          <Text style={styles.loadingText}>Loading dashboard...</Text>
         </View>
+      ) : (
+        <ScrollView style={styles.container}>
+          {/* Channel Header Section */}
+          <View style={styles.channelHeader}>
+            <View style={styles.channelInfo}>
+              <View style={styles.logoContainer}>
+                <Image 
+                  source={require('../../assets/logo/logo.jpg')} 
+                  style={styles.logo}
+                  resizeMode="contain"
+                />
+              </View>
+              
+              <View style={styles.channelTextInfo}>
+                <Text style={styles.channelName}>{user.name}</Text>
+                <Text style={styles.lastUpdate}>
+                  Last updated: {isLoadingAnalytics ? (
+                    <ActivityIndicator size="small" color="#DF0000" />
+                  ) : 'Today'}
+                </Text>
+              </View>
+            </View>
 
-          <TouchableOpacity style={styles.crownIcon}>
-            <Ionicons name="star" size={28} color="#FFA000" />
-          </TouchableOpacity>
-        </View>
-        
-        {/* Analytics Boxes */}
-        <View style={styles.analyticsRow}>
-          <View style={styles.analyticsBox}>
-            <View style={styles.analyticsHeader}>
-              <Text style={styles.analyticsTitle}>Stats</Text>
-              <Ionicons name="chevron-forward" size={18} color="#777" />
-            </View>
-            <Text style={styles.analyticsValue}>{formatNumber(userAnalytics.stats)}</Text>
-            <Text style={styles.analyticsTrend}>~</Text>
+            <TouchableOpacity style={styles.crownIcon}>
+              <Ionicons name="star" size={28} color="#FFA000" />
+            </TouchableOpacity>
           </View>
           
-          <View style={styles.analyticsBox}>
-            <View style={styles.analyticsHeader}>
-              <Text style={styles.analyticsTitle}>Subs</Text>
-              <Ionicons name="chevron-forward" size={18} color="#777" />
-            </View>
-            <Text style={styles.analyticsValue}>{formatNumber(userAnalytics.subs)}</Text>
-            <Text style={styles.analyticsTrend}>~</Text>
-          </View>
-        </View>
-        
-        <View style={styles.analyticsRow}>
-          <View style={styles.analyticsBox}>
-            <View style={styles.analyticsHeader}>
-              <Text style={styles.analyticsTitle}>Views</Text>
-              <Ionicons name="chevron-forward" size={18} color="#777" />
-            </View>
-            <Text style={styles.analyticsValue}>{formatNumber(userAnalytics.views)}</Text>
-            <Text style={styles.analyticsTrend}>~</Text>
+          {/* Daily Analytics Title */}
+          <View style={styles.sectionTitleContainer}>
+            <Text style={styles.sectionTitle}>Today's Updates{todayRefreshCount > 0 ? ` (${todayRefreshCount})` : ''}</Text>
+            <TouchableOpacity onPress={refreshData} disabled={isLoadingAnalytics}>
+              <Ionicons 
+                name="refresh-outline" 
+                size={18} 
+                color="#DF0000" 
+                style={isLoadingAnalytics ? styles.refreshingIcon : {}}
+              />
+            </TouchableOpacity>
           </View>
           
-          <View style={styles.analyticsBox}>
-            <View style={styles.analyticsHeader}>
-              <Text style={styles.analyticsTitle}>Videos</Text>
-              <Ionicons name="chevron-forward" size={18} color="#777" />
-            </View>
-            <Text style={styles.analyticsValue}>{formatNumber(userAnalytics.videos)}</Text>
-            <Text style={styles.analyticsTrend}>~</Text>
-          </View>
-        </View>
-        
-        {/* New Detailed Analytics Section */}
-        <View style={styles.detailedAnalyticsContainer}>
-          {/* Header with timeframe buttons */}
-          <View style={styles.analyticsHeader}>
-            <Text style={styles.analyticsHeaderTitle}>Analytics</Text>
-            <View style={styles.timeframeButtons}>
-              <TouchableOpacity 
-                style={[styles.timeframeButton, selectedTimeframe === '280' && styles.selectedTimeframe]}
-                onPress={() => setSelectedTimeframe('280')}
-              >
-                <Text style={[styles.timeframeText, selectedTimeframe === '280' && styles.selectedTimeframeText]}>28D</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.timeframeButton, selectedTimeframe === '90D' && styles.selectedTimeframe]}
-                onPress={() => setSelectedTimeframe('90D')}
-              >
-                <Text style={styles.timeframeText}>90D</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.timeframeButton, selectedTimeframe === 'Apr' && styles.selectedTimeframe]}
-                onPress={() => setSelectedTimeframe('Apr')}
-              >
-                <Text style={styles.timeframeText}>Apr</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.timeframeButton, selectedTimeframe === 'Mar' && styles.selectedTimeframe]}
-                onPress={() => setSelectedTimeframe('Mar')}
-              >
-                <Text style={styles.timeframeText}>Mar</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-          
-          {/* Analytics Cards */}
-          <View style={styles.detailedCardsContainer}>
-            <View style={styles.detailedCardsRow}>
-              {/* Subscribers Card */}
-              <View style={styles.detailedCard}>
-                <Text style={styles.cardTitle}>Subscribers</Text>
-                <Text style={styles.cardValue}>{detailedAnalytics.subscribers.value}</Text>
-                <View style={styles.averageContainer}>
-                  <Text style={styles.averageLabel}>Average</Text>
-                  <Text style={styles.averageValue}>{detailedAnalytics.subscribers.average} / day</Text>
-                </View>
+          {/* Analytics Boxes - Show Daily Updates */}
+          <View style={styles.analyticsRow}>
+            <View style={styles.analyticsBox}>
+              <View style={styles.analyticsHeader}>
+                <Text style={styles.analyticsTitle}>Stats</Text>
+                <Ionicons name="today-outline" size={18} color="#777" />
               </View>
-              
-              {/* Views Card */}
-              <View style={styles.detailedCard}>
-                <Text style={styles.cardTitle}>Views</Text>
-                <Text style={styles.cardValue}>{detailedAnalytics.views.value}</Text>
-                <View style={styles.averageContainer}>
-                  <Text style={styles.averageLabel}>Average</Text>
-                  <Text style={styles.averageValue}>{detailedAnalytics.views.average} / day</Text>
-                </View>
+              <Text style={styles.analyticsValue}>
+                {isLoadingAnalytics ? (
+                  <ActivityIndicator size="small" color="#DF0000" />
+                ) : (
+                  formatNumber(dailyAnalyticsData.stats)
+                )}
+              </Text>
+              <View style={styles.analyticsFooter}>
+                <Text style={styles.analyticsTrend}>Today</Text>
+                {todayRefreshCount > 1 && (
+                  <Text style={styles.analyticsAccumulated}>Updates: {todayRefreshCount}</Text>
+                )}
               </View>
             </View>
             
-            <View style={styles.detailedCardsRow}>
-              {/* Watch Hours Card */}
-              <View style={styles.detailedCard}>
-                <Text style={styles.cardTitle}>Watch hours</Text>
-                <Text style={styles.cardValue}>{detailedAnalytics.watchHours.value}</Text>
-                <View style={styles.averageContainer}>
-                  <Text style={styles.averageLabel}>Average</Text>
-                  <Text style={styles.averageValue}>{detailedAnalytics.watchHours.average} / day</Text>
-                </View>
+            <View style={styles.analyticsBox}>
+              <View style={styles.analyticsHeader}>
+                <Text style={styles.analyticsTitle}>Subs</Text>
+                <Ionicons name="today-outline" size={18} color="#777" />
+              </View>
+              <Text style={styles.analyticsValue}>
+                {isLoadingAnalytics ? (
+                  <ActivityIndicator size="small" color="#DF0000" />
+                ) : (
+                  formatNumber(dailyAnalyticsData.subscribers)
+                )}
+              </Text>
+              <View style={styles.analyticsFooter}>
+                <Text style={styles.analyticsTrend}>Today</Text>
+                {todayRefreshCount > 1 && (
+                  <Text style={styles.analyticsAccumulated}>Updates: {todayRefreshCount}</Text>
+                )}
               </View>
             </View>
           </View>
-        </View>
-      </ScrollView>
+          
+          <View style={styles.analyticsRow}>
+            <View style={styles.analyticsBox}>
+              <View style={styles.analyticsHeader}>
+                <Text style={styles.analyticsTitle}>Views</Text>
+                <Ionicons name="today-outline" size={18} color="#777" />
+              </View>
+              <Text style={styles.analyticsValue}>
+                {isLoadingAnalytics ? (
+                  <ActivityIndicator size="small" color="#DF0000" />
+                ) : (
+                  formatNumber(dailyAnalyticsData.views)
+                )}
+              </Text>
+              <View style={styles.analyticsFooter}>
+                <Text style={styles.analyticsTrend}>Today</Text>
+                {todayRefreshCount > 1 && (
+                  <Text style={styles.analyticsAccumulated}>Updates: {todayRefreshCount}</Text>
+                )}
+              </View>
+            </View>
+            
+            <View style={styles.analyticsBox}>
+              <View style={styles.analyticsHeader}>
+                <Text style={styles.analyticsTitle}>Videos</Text>
+                <Ionicons name="today-outline" size={18} color="#777" />
+              </View>
+              <Text style={styles.analyticsValue}>
+                {isLoadingAnalytics ? (
+                  <ActivityIndicator size="small" color="#DF0000" />
+                ) : (
+                  formatNumber(dailyAnalyticsData.videos)
+                )}
+              </Text>
+              <View style={styles.analyticsFooter}>
+                <Text style={styles.analyticsTrend}>Today</Text>
+                {todayRefreshCount > 1 && (
+                  <Text style={styles.analyticsAccumulated}>Updates: {todayRefreshCount}</Text>
+                )}
+              </View>
+            </View>
+          </View>
+          
+          {/* New Detailed Analytics Section - Shows Total Analytics */}
+          <View style={styles.detailedAnalyticsContainer}>
+            {/* Header with timeframe buttons */}
+            <View style={styles.analyticsHeader}>
+              <View style={styles.analyticsHeaderTitleContainer}>
+                <Text style={styles.analyticsHeaderTitle}>Total Analytics</Text>
+                <TouchableOpacity 
+                  style={styles.refreshButton} 
+                  onPress={refreshData}
+                  disabled={isLoadingAnalytics}
+                >
+                  <Ionicons 
+                    name="refresh-outline" 
+                    size={20} 
+                    color="#DF0000" 
+                    style={isLoadingAnalytics ? styles.refreshingIcon : {}}
+                  />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.timeframeButtons}>
+                <TouchableOpacity 
+                  style={[styles.timeframeButton, selectedTimeframe === '280' && styles.selectedTimeframe]}
+                  onPress={() => setSelectedTimeframe('280')}
+                >
+                  <Text style={[styles.timeframeText, selectedTimeframe === '280' && styles.selectedTimeframeText]}>28D</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.timeframeButton, selectedTimeframe === '90D' && styles.selectedTimeframe]}
+                  onPress={() => setSelectedTimeframe('90D')}
+                >
+                  <Text style={styles.timeframeText}>90D</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.timeframeButton, selectedTimeframe === 'Apr' && styles.selectedTimeframe]}
+                  onPress={() => setSelectedTimeframe('Apr')}
+                >
+                  <Text style={styles.timeframeText}>Apr</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.timeframeButton, selectedTimeframe === 'Mar' && styles.selectedTimeframe]}
+                  onPress={() => setSelectedTimeframe('Mar')}
+                >
+                  <Text style={styles.timeframeText}>Mar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+            
+            {/* Analytics Cards */}
+            <View style={styles.detailedCardsContainer}>
+              {isLoadingAnalytics ? (
+                <View style={styles.loadingDetailedCards}>
+                  <ActivityIndicator size="large" color="#DF0000" />
+                  <Text style={styles.loadingText}>Loading analytics...</Text>
+                </View>
+              ) : (
+                <>
+                  <View style={styles.detailedCardsRow}>
+                    {/* Subscribers Card */}
+                    <View style={styles.detailedCard}>
+                      <Text style={styles.cardTitle}>Subscribers</Text>
+                      <Text style={styles.cardValue}>{formatNumber(detailedAnalytics.subscribers.value)}</Text>
+                      <View style={styles.averageContainer}>
+                        <Text style={styles.averageLabel}>Average</Text>
+                        <Text style={styles.averageValue}>{formatNumber(parseFloat(detailedAnalytics.subscribers.average))} / day</Text>
+                      </View>
+                    </View>
+                    
+                    {/* Views Card */}
+                    <View style={styles.detailedCard}>
+                      <Text style={styles.cardTitle}>Views</Text>
+                      <Text style={styles.cardValue}>{formatNumber(detailedAnalytics.views.value)}</Text>
+                      <View style={styles.averageContainer}>
+                        <Text style={styles.averageLabel}>Average</Text>
+                        <Text style={styles.averageValue}>{formatNumber(parseFloat(detailedAnalytics.views.average))} / day</Text>
+                      </View>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.detailedCardsRow}>
+                    {/* Watch Hours Card */}
+                    <View style={styles.detailedCard}>
+                      <Text style={styles.cardTitle}>Watch hours</Text>
+                      <Text style={styles.cardValue}>{formatNumber(detailedAnalytics.watchHours.value)}</Text>
+                      <View style={styles.averageContainer}>
+                        <Text style={styles.averageLabel}>Average</Text>
+                        <Text style={styles.averageValue}>{formatNumber(parseFloat(detailedAnalytics.watchHours.average))} / day</Text>
+                      </View>
+                    </View>
+                    
+                    {/* Likes Card */}
+                    <View style={styles.detailedCard}>
+                      <Text style={styles.cardTitle}>Likes</Text>
+                      <Text style={styles.cardValue}>{formatNumber(analyticsData.likes || 0)}</Text>
+                      <View style={styles.averageContainer}>
+                        <Text style={styles.averageLabel}>Total</Text>
+                        <Text style={styles.averageValue}>Engagement</Text>
+                      </View>
+                    </View>
+                  </View>
+                </>
+              )}
+            </View>
+          </View>
+        </ScrollView>
+      )}
     </SafeAreaView>
   );
 }
@@ -356,6 +541,16 @@ const styles = StyleSheet.create({
     color: '#777',
     fontSize: 16,
   },
+  analyticsFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  analyticsAccumulated: {
+    color: '#4CAF50',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
   // New Analytics Styles
   detailedAnalyticsContainer: {
     paddingHorizontal: 16,
@@ -424,5 +619,40 @@ const styles = StyleSheet.create({
   averageValue: {
     color: '#999',
     fontSize: 12,
+  },
+  loadingDetailedCards: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  analyticsHeaderTitleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  refreshButton: {
+    padding: 8,
+  },
+  refreshingIcon: {
+    opacity: 0.5,
+  },
+  fullLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    padding: 20,
+  },
+  sectionTitleContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  sectionTitle: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
 });

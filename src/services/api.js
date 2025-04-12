@@ -70,6 +70,32 @@ API.interceptors.response.use(
   }
 );
 
+// Add a getAuthToken function to the API object
+API.getAuthToken = async () => {
+  try {
+    // Get the token from AsyncStorage
+    const token = await AsyncStorage.getItem('token');
+    const tokenExpiry = await AsyncStorage.getItem('tokenExpiry');
+    
+    // Check if token exists and is not expired
+    if (!token) {
+      console.log('No auth token found');
+      return null;
+    }
+    
+    // Check token expiration
+    if (tokenExpiry && new Date().getTime() > parseInt(tokenExpiry, 10)) {
+      console.log('Token expired during getAuthToken');
+      return null;
+    }
+    
+    return token;
+  } catch (error) {
+    console.error('Error getting auth token:', error);
+    return null;
+  }
+};
+
 // Auth services
 export const authService = {
   // Register a new user
