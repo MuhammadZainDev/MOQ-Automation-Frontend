@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -9,12 +9,20 @@ import {
   ActivityIndicator, 
   Alert,
   Image,
-  StatusBar 
+  StatusBar,
+  TextInput,
+  Dimensions,
+  RefreshControl
 } from 'react-native';
 import { useAuth } from '../../src/context/AuthContext';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { adminService } from '../../src/services/adminApi';
+import { LineChart, BarChart } from 'react-native-gifted-charts';
+import { LinearGradient } from 'expo-linear-gradient';
+
+// Get screen width for responsive chart
+const screenWidth = Dimensions.get('window').width;
 
 // Define analytics type
 type UserAnalyticsData = {
@@ -57,6 +65,7 @@ const formatNumber = (num: number): string => {
 export default function HomeScreen() {
   const { user, isLoading, logout } = useAuth();
   const [selectedTimeframe, setSelectedTimeframe] = useState('280');
+  const [showOptions, setShowOptions] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<UserAnalyticsData>({
     stats: 0,
     views: 0,
@@ -75,8 +84,45 @@ export default function HomeScreen() {
     subscribers: 0
   });
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
-  const [todayRefreshCount, setTodayRefreshCount] = useState(0);
+  
+  // Mock data for monthly average bar chart
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
 
+  const getMonthlyBarData = () => {
+    const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+    const values = [250, 500, 745, 370, 600, 350, 400, 520, 480, 650, 550, 700];
+    
+    return months.map((month, index) => ({
+      value: values[index],
+      label: month,
+      frontColor: index === selectedMonth ? '#FF4D4D' : 'rgba(255, 77, 77, 0.4)',
+      onPress: () => handleBarPress(index)
+    }));
+  };
+
+  const handleBarPress = (monthIndex: number) => {
+    setSelectedMonth(monthIndex);
+    // Update subscriber info based on selected month
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    console.log(`Selected month: ${months[monthIndex]}`);
+  };
+
+  const barData = getMonthlyBarData();
+  
+  // Mock data for yearly views line chart
+  const lineData = [
+    {value: 0},
+    {value: 20},
+    {value: 18},
+    {value: 40},
+    {value: 36},
+    {value: 60},
+    {value: 54},
+    {value: 85},
+    {value: 78},
+    {value: 105},
+  ];
+  
   // Debug user info
   console.log('Home Screen - Current User:', user?.name, user?.role);
   
@@ -89,9 +135,6 @@ export default function HomeScreen() {
       videos: totalData.videos || 0,
       subscribers: totalData.subscribers || 0
     });
-    
-    // Increment refresh counter when we get new data
-    setTodayRefreshCount(prev => prev + 1);
     
     console.log('Updated today\'s analytics with real data:', totalData);
   };
@@ -192,6 +235,9 @@ export default function HomeScreen() {
       .finally(() => setIsLoadingAnalytics(false));
   };
 
+  // Add state for options menu
+  const [showChartOptions, setShowChartOptions] = useState(false);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
@@ -201,7 +247,7 @@ export default function HomeScreen() {
           <Text style={styles.loadingText}>Loading dashboard...</Text>
         </View>
       ) : (
-        <ScrollView style={styles.container}>
+      <ScrollView style={styles.container}>
           {/* Channel Header Section */}
           <View style={styles.channelHeader}>
             <View style={styles.channelInfo}>
@@ -226,19 +272,11 @@ export default function HomeScreen() {
             <TouchableOpacity style={styles.crownIcon}>
               <Ionicons name="star" size={28} color="#FFA000" />
             </TouchableOpacity>
-          </View>
-          
+        </View>
+
           {/* Daily Analytics Title */}
           <View style={styles.sectionTitleContainer}>
-            <Text style={styles.sectionTitle}>Today's Updates{todayRefreshCount > 0 ? ` (${todayRefreshCount})` : ''}</Text>
-            <TouchableOpacity onPress={refreshData} disabled={isLoadingAnalytics}>
-              <Ionicons 
-                name="refresh-outline" 
-                size={18} 
-                color="#DF0000" 
-                style={isLoadingAnalytics ? styles.refreshingIcon : {}}
-              />
-            </TouchableOpacity>
+            <Text style={styles.sectionTitle}>Today's Updates</Text>
           </View>
           
           {/* Analytics Boxes - Show Daily Updates */}
@@ -254,15 +292,12 @@ export default function HomeScreen() {
                 ) : (
                   formatNumber(dailyAnalyticsData.stats)
                 )}
-              </Text>
+          </Text>
               <View style={styles.analyticsFooter}>
                 <Text style={styles.analyticsTrend}>Today</Text>
-                {todayRefreshCount > 1 && (
-                  <Text style={styles.analyticsAccumulated}>Updates: {todayRefreshCount}</Text>
-                )}
               </View>
-            </View>
-            
+        </View>
+        
             <View style={styles.analyticsBox}>
               <View style={styles.analyticsHeader}>
                 <Text style={styles.analyticsTitle}>Subs</Text>
@@ -277,9 +312,6 @@ export default function HomeScreen() {
               </Text>
               <View style={styles.analyticsFooter}>
                 <Text style={styles.analyticsTrend}>Today</Text>
-                {todayRefreshCount > 1 && (
-                  <Text style={styles.analyticsAccumulated}>Updates: {todayRefreshCount}</Text>
-                )}
               </View>
             </View>
           </View>
@@ -299,9 +331,6 @@ export default function HomeScreen() {
               </Text>
               <View style={styles.analyticsFooter}>
                 <Text style={styles.analyticsTrend}>Today</Text>
-                {todayRefreshCount > 1 && (
-                  <Text style={styles.analyticsAccumulated}>Updates: {todayRefreshCount}</Text>
-                )}
               </View>
             </View>
             
@@ -319,60 +348,75 @@ export default function HomeScreen() {
               </Text>
               <View style={styles.analyticsFooter}>
                 <Text style={styles.analyticsTrend}>Today</Text>
-                {todayRefreshCount > 1 && (
-                  <Text style={styles.analyticsAccumulated}>Updates: {todayRefreshCount}</Text>
-                )}
               </View>
             </View>
           </View>
           
           {/* New Detailed Analytics Section - Shows Total Analytics */}
           <View style={styles.detailedAnalyticsContainer}>
-            {/* Header with timeframe buttons */}
+            {/* Header with standard dropdown */}
             <View style={styles.analyticsHeader}>
               <View style={styles.analyticsHeaderTitleContainer}>
                 <Text style={styles.analyticsHeaderTitle}>Total Analytics</Text>
-                <TouchableOpacity 
-                  style={styles.refreshButton} 
-                  onPress={refreshData}
-                  disabled={isLoadingAnalytics}
-                >
-                  <Ionicons 
-                    name="refresh-outline" 
-                    size={20} 
-                    color="#DF0000" 
-                    style={isLoadingAnalytics ? styles.refreshingIcon : {}}
-                  />
-                </TouchableOpacity>
-              </View>
-              <View style={styles.timeframeButtons}>
-                <TouchableOpacity 
-                  style={[styles.timeframeButton, selectedTimeframe === '280' && styles.selectedTimeframe]}
-                  onPress={() => setSelectedTimeframe('280')}
-                >
-                  <Text style={[styles.timeframeText, selectedTimeframe === '280' && styles.selectedTimeframeText]}>28D</Text>
-                </TouchableOpacity>
                 
-                <TouchableOpacity 
-                  style={[styles.timeframeButton, selectedTimeframe === '90D' && styles.selectedTimeframe]}
-                  onPress={() => setSelectedTimeframe('90D')}
-                >
-                  <Text style={styles.timeframeText}>90D</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.timeframeButton, selectedTimeframe === 'Apr' && styles.selectedTimeframe]}
-                  onPress={() => setSelectedTimeframe('Apr')}
-                >
-                  <Text style={styles.timeframeText}>Apr</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.timeframeButton, selectedTimeframe === 'Mar' && styles.selectedTimeframe]}
-                  onPress={() => setSelectedTimeframe('Mar')}
-                >
-                  <Text style={styles.timeframeText}>Mar</Text>
-                </TouchableOpacity>
+                {/* Standard dropdown select */}
+                <View style={styles.selectContainer}>
+                  <TouchableOpacity 
+                    style={styles.standardDropdown}
+                    onPress={() => setShowOptions(!showOptions)}
+                  >
+                    <Text style={styles.dropdownValue}>
+                      {selectedTimeframe === '280' ? '28 Days' : 
+                       selectedTimeframe === '90D' ? '90 Days' : 
+                       selectedTimeframe === 'Apr' ? 'April' : 'March'}
+                    </Text>
+                    <Ionicons name="chevron-down" size={14} color="#999" />
+                  </TouchableOpacity>
+                  
+                  {showOptions && (
+                    <View style={styles.optionsContainer}>
+                      <TouchableOpacity 
+                        style={[styles.option, selectedTimeframe === '280' && styles.selectedOption]}
+                        onPress={() => {
+                          setSelectedTimeframe('280');
+                          setShowOptions(false);
+                        }}
+                      >
+                        <Text style={[styles.optionText, selectedTimeframe === '280' && styles.selectedOptionText]}>28 Days</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.option, selectedTimeframe === '90D' && styles.selectedOption]}
+                        onPress={() => {
+                          setSelectedTimeframe('90D');
+                          setShowOptions(false);
+                        }}
+                      >
+                        <Text style={[styles.optionText, selectedTimeframe === '90D' && styles.selectedOptionText]}>90 Days</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.option, selectedTimeframe === 'Apr' && styles.selectedOption]}
+                        onPress={() => {
+                          setSelectedTimeframe('Apr');
+                          setShowOptions(false);
+                        }}
+                      >
+                        <Text style={[styles.optionText, selectedTimeframe === 'Apr' && styles.selectedOptionText]}>April</Text>
+                      </TouchableOpacity>
+                      
+                      <TouchableOpacity 
+                        style={[styles.option, selectedTimeframe === 'Mar' && styles.selectedOption]}
+                        onPress={() => {
+                          setSelectedTimeframe('Mar');
+                          setShowOptions(false);
+                        }}
+                      >
+                        <Text style={[styles.optionText, selectedTimeframe === 'Mar' && styles.selectedOptionText]}>March</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
               </View>
             </View>
             
@@ -403,10 +447,10 @@ export default function HomeScreen() {
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
                         <Text style={styles.averageValue}>{formatNumber(parseFloat(detailedAnalytics.views.average))} / day</Text>
-                      </View>
-                    </View>
-                  </View>
-                  
+            </View>
+          </View>
+        </View>
+        
                   <View style={styles.detailedCardsRow}>
                     {/* Watch Hours Card */}
                     <View style={styles.detailedCard}>
@@ -432,7 +476,77 @@ export default function HomeScreen() {
               )}
             </View>
           </View>
-        </ScrollView>
+          
+          {/* Monthly Average Chart */}
+          <View style={[styles.chartContainer, {backgroundColor: '#212121'}]}>
+            <View style={styles.redHeader}>
+              <View style={styles.redHeaderTextContainer}>
+                <Text style={styles.redHeaderAmount}>$ 476</Text>
+                <Text style={styles.redHeaderText}>Monthly average</Text>
+              </View>
+              <TouchableOpacity style={styles.redHeaderMoreBtn} onPress={() => setShowChartOptions(!showChartOptions)}>
+                <Feather name="more-horizontal" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Subscribers Info Box */}
+            <View style={styles.subscriberInfoBox}>
+              <View style={styles.subscriberInfoHeader}>
+                <Text style={styles.subscriberCount}>0</Text>
+                <Text style={styles.subscriberDate}>Jan 25<Text style={styles.superscript}>th</Text></Text>
+                <View style={styles.infoBadge}>
+                  <Text style={styles.infoBadgeText}>i</Text>
+                </View>
+              </View>
+              <Text style={styles.subscriberMessage}>
+                In January, your subscribers remained relatively stable. Keep driving for growth!
+              </Text>
+            </View>
+            
+            {/* Divider */}
+            <View style={styles.divider} />
+            
+            {/* Chart Options Popup */}
+            {showChartOptions && (
+              <View style={styles.chartOptionsContainer}>
+                <TouchableOpacity style={styles.chartOption}>
+                  <Feather name="download" size={18} color="#fff" />
+                  <Text style={styles.chartOptionText}>Export Data</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.chartOption}>
+                  <Feather name="refresh-cw" size={18} color="#fff" />
+                  <Text style={styles.chartOptionText}>Refresh</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.chartOption}>
+                  <Feather name="settings" size={18} color="#fff" />
+                  <Text style={styles.chartOptionText}>Settings</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            <View style={styles.chartWrapper}>
+              <BarChart
+                data={barData}
+                width={screenWidth - 80}
+                height={220}
+                barWidth={30}
+                spacing={18}
+                barBorderRadius={4}
+                hideRules
+                xAxisThickness={0}
+                yAxisThickness={0}
+                hideYAxisText
+                noOfSections={3}
+                maxValue={750}
+                labelWidth={30}
+                xAxisLabelTextStyle={{color: '#ccc', textAlign: 'center'}}
+                hideOrigin
+              />
+            </View>
+          </View>
+          
+          {/* Yearly Views Chart removed */}
+      </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -546,11 +660,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  analyticsAccumulated: {
-    color: '#4CAF50',
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
   // New Analytics Styles
   detailedAnalyticsContainer: {
     paddingHorizontal: 16,
@@ -562,26 +671,56 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  timeframeButtons: {
+  selectContainer: {
+    position: 'relative',
+    marginLeft: 'auto',
+    zIndex: 100,
+  },
+  standardDropdown: {
     flexDirection: 'row',
-  },
-  timeframeButton: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#333',
-    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#555',
+    borderRadius: 5,
     paddingHorizontal: 12,
-    borderRadius: 20,
-    marginLeft: 8,
+    paddingVertical: 8,
+    width: 120,
   },
-  selectedTimeframe: {
-    backgroundColor: '#DF0000',
-  },
-  timeframeText: {
-    color: '#999',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  selectedTimeframeText: {
+  dropdownValue: {
     color: '#FFF',
+    fontSize: 14,
+  },
+  optionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    right: 0,
+    width: 120,
+    backgroundColor: '#333',
+    borderWidth: 1, 
+    borderColor: '#555',
+    borderRadius: 5,
+    marginTop: 5,
+    overflow: 'hidden',
+    zIndex: 1000,
+  },
+  option: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  selectedOption: {
+    backgroundColor: '#444',
+  },
+  optionText: {
+    color: '#CCC',
+    fontSize: 14,
+  },
+  selectedOptionText: {
+    color: '#FFF',
+    fontWeight: 'bold',
   },
   detailedCardsContainer: {
     marginTop: 10,
@@ -629,19 +768,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-  },
-  refreshButton: {
-    padding: 8,
-  },
-  refreshingIcon: {
-    opacity: 0.5,
-  },
-  fullLoadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#000',
-    padding: 20,
+    width: '100%',
   },
   sectionTitleContainer: {
     flexDirection: 'row',
@@ -654,5 +781,149 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 18,
     fontWeight: 'bold',
+  },
+  refreshingIcon: {
+    opacity: 0.5,
+  },
+  fullLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+    padding: 20,
+  },
+  chartContainer: {
+    marginTop: 20,
+    marginBottom: 30,
+    backgroundColor: '#212121',
+    borderRadius: 10,
+    marginHorizontal: 16,
+  },
+  chartTitle: {
+    color: '#FFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+  },
+  chartWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  redHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    backgroundColor: '#DF0000',
+    padding: 15,
+    borderTopEndRadius: 8,
+    borderTopStartRadius: 8,
+    marginBottom: 15,
+  },
+  redHeaderTextContainer: {
+    flexDirection: 'column',
+  },
+  redHeaderAmount: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  redHeaderText: {
+    color: '#fff',
+    fontSize: 14,
+    marginTop: 2,
+  },
+  redHeaderMoreBtn: {
+    alignSelf: 'center',
+  },
+  dailyAverageHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+    position: 'relative',
+    backgroundColor: '#DF0000',
+    paddingBottom: 15,
+    paddingHorizontal: 0,
+    paddingTop: 0,
+    borderRadius: 8,
+    marginHorizontal: 0,
+  },
+  subscriberInfoBox: {
+    borderRadius: 8,
+    padding: 20,
+    marginBottom: 10,
+    backgroundColor: 'transparent',
+  },
+  subscriberInfoHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  subscriberCount: {
+    color: '#FFF',
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginRight: 8,
+  },
+  subscriberDate: {
+    color: '#CCC',
+    fontSize: 16,
+  },
+  superscript: {
+    fontSize: 10,
+    lineHeight: 14,
+    color: '#CCC',
+  },
+  infoBadge: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#2F80ED',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 'auto',
+  },
+  infoBadgeText: {
+    color: '#FFF',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  subscriberMessage: {
+    color: '#CCC',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#333',
+    marginHorizontal: 10,
+    marginBottom: 15,
+  },
+  chartOptionsContainer: {
+    position: 'absolute',
+    top: 40,
+    right: 0,
+    backgroundColor: '#333',
+    borderRadius: 8,
+    padding: 5,
+    zIndex: 100,
+    width: 150,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  chartOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  chartOptionText: {
+    color: '#fff',
+    marginLeft: 10,
+    fontSize: 14,
   },
 });
