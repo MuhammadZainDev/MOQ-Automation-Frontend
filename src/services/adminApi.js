@@ -53,6 +53,25 @@ export const adminService = {
     }
   },
 
+  // Toggle user active status (can activate or deactivate)
+  toggleUserActive: async (userId, isActive) => {
+    try {
+      const userDetails = await adminService.getUserById(userId);
+      
+      // If isActive not provided, toggle the current status
+      const newStatus = isActive !== undefined ? isActive : !userDetails?.data?.isActive;
+      
+      const response = await API.post('/auth/toggle-active', {
+        userId: parseInt(userId, 10),
+        isActive: newStatus
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+      throw error;
+    }
+  },
+
   // Get all users
   getAllUsers: async () => {
     try {

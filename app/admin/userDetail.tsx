@@ -8,7 +8,8 @@ import {
   ScrollView,
   TextInput,
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -103,6 +104,7 @@ export default function UserDetailScreen() {
   const [premiumCountryViews, setPremiumCountryViews] = useState('');
   const [subscribers, setSubscribers] = useState('');
   const [savingAnalytics, setSavingAnalytics] = useState(false);
+  const [toggleLoading, setToggleLoading] = useState(false);
 
   // Fetch user details and analytics
   useEffect(() => {
@@ -247,6 +249,47 @@ export default function UserDetailScreen() {
       });
     } finally {
       setSavingAnalytics(false);
+    }
+  };
+
+  const handleToggleActive = async () => {
+    try {
+      setToggleLoading(true);
+      
+      const response = await adminService.toggleUserActive(userId);
+      
+      if (response.success) {
+        // Fetch the updated user details
+        const updatedUserResponse = await adminService.getUserById(userId);
+        if (updatedUserResponse.success && updatedUserResponse.data) {
+          setUser(updatedUserResponse.data);
+        }
+        
+        // Show success message
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'User status updated successfully',
+          position: 'bottom'
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Failed to update user status',
+          position: 'bottom'
+        });
+      }
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to update user status',
+        position: 'bottom'
+      });
+    } finally {
+      setToggleLoading(false);
     }
   };
 
@@ -446,6 +489,51 @@ export default function UserDetailScreen() {
               keyboardType="numeric"
             />
           </View>
+          
+          {/* Status Toggle Button */}
+          <TouchableOpacity 
+            style={[
+              styles.statusToggleButton, 
+              user.isActive ? styles.statusToggleDeactivate : styles.statusToggleActivate
+            ]} 
+            onPress={() => {
+              Alert.alert(
+                user.isActive ? 'Deactivate User' : 'Activate User',
+                user.isActive 
+                  ? `Are you sure you want to deactivate ${user.name}? They will lose access to the platform.`
+                  : `Are you sure you want to activate ${user.name}? An email notification will be sent to ${user.email} informing them of their approval.`,
+                [
+                  { text: 'Cancel', style: 'cancel' },
+                  { 
+                    text: user.isActive ? 'Deactivate' : 'Activate', 
+                    onPress: handleToggleActive,
+                    style: 'destructive'
+                  }
+                ]
+              )
+            }}
+          >
+            {toggleLoading ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Ionicons 
+                  name={user.isActive ? 'close-circle-outline' : 'checkmark-circle-outline'} 
+                  size={18} 
+                  color="#fff" 
+                  style={styles.toggleIcon} 
+                />
+                <Text style={styles.statusToggleText}>
+                  {user.isActive ? 'Deactivate User' : 'Activate User'}
+                </Text>
+                {!user.isActive && (
+                  <Text style={styles.emailNotificationText}>
+                    Email notification will be sent
+                  </Text>
+                )}
+              </>
+            )}
+          </TouchableOpacity>
           
           <TouchableOpacity 
             style={[styles.saveButton, savingAnalytics && styles.savingButton]} 
@@ -695,5 +783,35 @@ const styles = StyleSheet.create({
     width: '48%',
     alignItems: 'center',
     marginHorizontal: 5,
+  },
+  statusToggleButton: {
+    backgroundColor: '#DF0000',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    height: 55,
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  statusToggleDeactivate: {
+    backgroundColor: '#E57373',
+  },
+  statusToggleActivate: {
+    backgroundColor: '#4CAF50',
+  },
+  toggleIcon: {
+    marginRight: 10,
+  },
+  statusToggleText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  emailNotificationText: {
+    color: '#fff',
+    fontSize: 12,
+    fontStyle: 'italic',
+    marginTop: 4,
+    opacity: 0.8,
   },
 }); 

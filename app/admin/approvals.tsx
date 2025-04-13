@@ -80,7 +80,7 @@ export default function ApprovalsScreen() {
         Toast.show({
           type: 'success',
           text1: 'Success',
-          text2: 'User has been approved successfully.',
+          text2: 'User has been approved and notification email sent.',
           position: 'bottom'
         });
       }
@@ -95,6 +95,7 @@ export default function ApprovalsScreen() {
     } finally {
       setLoading(false);
       setSelectedUserId(null);
+      setConfirmModalVisible(false);
     }
   };
 
@@ -168,7 +169,7 @@ export default function ApprovalsScreen() {
                     </View>
                     <View style={styles.userDetails}>
                       <Text style={styles.userName}>{user.name}</Text>
-                      <Text style={styles.userEmail}>{user.email}</Text>
+                      <Text style={styles.userEmail} numberOfLines={1} ellipsizeMode="tail">{user.email}</Text>
                       <Text style={styles.userDate}>Joined: {user.createdAt}</Text>
                     </View>
                   </View>
@@ -200,7 +201,9 @@ export default function ApprovalsScreen() {
           onClose={() => setConfirmModalVisible(false)}
           onConfirm={confirmApprove}
           title="Confirm Approval"
-          message={selectedUser ? `Are you sure you want to approve "${selectedUser.name}"?` : 'Are you sure you want to approve this user?'}
+          message={selectedUser ? 
+            `Are you sure you want to approve "${selectedUser.name}"? An email notification will be sent to ${selectedUser.email} informing them of their approval.` : 
+            'Are you sure you want to approve this user? They will receive an email notification about their approval.'}
           confirmText="Approve"
           cancelText="Cancel"
         />
