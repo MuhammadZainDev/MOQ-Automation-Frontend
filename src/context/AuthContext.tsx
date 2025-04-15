@@ -541,12 +541,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   };
 
   const contextValue = {
-    user,
-    isLoading,
-    error,
-    login,
+        user,
+        isLoading,
+        error,
+        login,
     logout,
-    signup,
+        signup,
     forgotPassword,
     verifyResetCode,
     resetPassword,
