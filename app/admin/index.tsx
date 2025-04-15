@@ -5,13 +5,13 @@ import {
   StyleSheet, 
   TouchableOpacity,
   ActivityIndicator,
-  ScrollView,
-  Alert
+  ScrollView
 } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import AdminLayout from '../../src/components/AdminLayout';
 import { adminService } from '../../src/services/adminApi';
+import Toast from 'react-native-toast-message';
 
 // Initial empty stats
 const initialStats = {
@@ -49,7 +49,12 @@ export default function AdminDashboard() {
       isStatsDisplayed.current = true;
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
-      Alert.alert('Error', 'Failed to load dashboard statistics.');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to load dashboard statistics.',
+        position: 'bottom'
+      });
     } finally {
       setLoading(false);
     }

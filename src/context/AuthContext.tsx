@@ -3,6 +3,8 @@ import { authService } from '../services/api';
 import { router } from 'expo-router';
 import Toast from 'react-native-toast-message';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as authApi from '../services/authApi';
+import axios from 'axios';
 
 // User type definition
 type User = {
@@ -18,10 +20,16 @@ type AuthContextType = {
   user: User | null;
   isLoading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<{success: boolean, error?: string}>;
-  signup: (name: string, email: string, password: string) => Promise<{success: boolean, error?: string}>;
+  login: (email: string, password: string) => Promise<any>;
   logout: () => Promise<void>;
+  signup: (name: string, email: string, password: string) => Promise<any>;
+  forgotPassword: (email: string) => Promise<any>;
+  verifyResetCode: (email: string, resetCode: string) => Promise<any>;
+  resetPassword: (email: string, resetCode: string, newPassword: string) => Promise<any>;
   checkTokenExpiry: () => Promise<boolean>;
+  register: (name: string, email: string, password: string) => Promise<any>;
+  clearError: () => void;
+  verifyCode: (email: string, code: string) => Promise<any>;
 };
 
 // Create the auth context with default values
@@ -33,6 +41,12 @@ const AuthContext = createContext<AuthContextType>({
   signup: async () => ({ success: false }),
   logout: async () => {},
   checkTokenExpiry: async () => false,
+  forgotPassword: async () => ({ success: false }),
+  verifyResetCode: async () => ({ success: false }),
+  resetPassword: async () => ({ success: false }),
+  register: async () => ({ success: false }),
+  clearError: () => {},
+  verifyCode: async () => ({ success: false }),
 });
 
 // Auth provider props
@@ -286,17 +300,222 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  // Forgot password method
+  const forgotPassword = async (email: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Starting forgot password process for email:', email);
+      const response = await authService.forgotPassword(email);
+      
+      if (response.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Code Sent',
+          text2: 'If your email is registered, you will receive a reset code.',
+          position: 'bottom'
+        });
+        
+        return { success: true, email };
+      }
+    } catch (error) {
+      const errorMsg = error.message || 'Failed to send reset code';
+      setError(errorMsg);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: errorMsg,
+        position: 'bottom'
+      });
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Verify reset code method
+  const verifyResetCode = async (email: string, resetCode: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Verifying reset code for email:', email, 'code:', resetCode);
+      
+      const response = await authService.verifyResetCode(email, resetCode);
+      console.log("Verification API response:", response);
+      
+      // Check if the response indicates success
+      if (response && response.valid === true) {
+        Toast.show({
+          type: 'success',
+          text1: 'Code Verified',
+          text2: 'Reset code verified successfully.',
+          position: 'bottom'
+        });
+        
+        return { success: true, email, resetCode };
+      } else {
+        const errorMsg = 'Invalid or expired verification code';
+        setError(errorMsg);
+        Toast.show({
+          type: 'error',
+          text1: 'Verification Failed',
+          text2: errorMsg,
+          position: 'bottom'
+        });
+        return { success: false, error: errorMsg };
+      }
+    } catch (error) {
+      const errorMsg = error.message || 'Invalid or expired code';
+      setError(errorMsg);
+      console.error("Verification error:", error);
+      
+      Toast.show({
+        type: 'error',
+        text1: 'Verification Failed',
+        text2: errorMsg,
+        position: 'bottom'
+      });
+      
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Reset password method
+  const resetPassword = async (email: string, resetCode: string, newPassword: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Resetting password for email:', email);
+      const response = await authService.resetPassword(email, resetCode, newPassword);
+      
+      if (response.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Password Reset',
+          text2: 'Your password has been reset successfully. Please login with your new password.',
+          position: 'bottom'
+        });
+        
+        return { success: true };
+      }
+    } catch (error) {
+      const errorMsg = error.message || 'Failed to reset password';
+      setError(errorMsg);
+      Toast.show({
+        type: 'error',
+        text1: 'Reset Failed',
+        text2: errorMsg,
+        position: 'bottom'
+      });
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const register = async (name: string, email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Starting signup process with name:', name);
+      const response = await authService.signup({ name, email, password });
+      console.log('Signup response received:', response);
+      
+      if (response && response.user) {
+        console.log('Signup successful with user:', response.user);
+        
+        // Don't set the user after signup - just show success message
+        Toast.show({
+          type: 'success',
+          text1: 'Signup Successful',
+          text2: 'Your account has been created successfully! Please login.',
+          position: 'bottom'
+        });
+        
+        // Return success so the calling component can handle navigation
+        return { success: true };
+      } else {
+        console.log('Invalid response format:', response);
+        throw new Error('Invalid response format from server');
+      }
+    } catch (error) {
+      const errorMsg = error.message || 'Signup failed';
+      setError(errorMsg);
+      console.error('Signup error details:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Signup Failed',
+        text2: errorMsg,
+        position: 'bottom'
+      });
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const clearError = () => {
+    setError(null);
+  };
+
+  const verifyCode = async (email: string, code: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Verifying reset code for email:', email);
+      const response = await authService.verifyResetCode(email, code);
+      
+      if (response.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Code Verified',
+          text2: 'Reset code verified successfully.',
+          position: 'bottom'
+        });
+        
+        return { success: true, email, resetCode: code };
+      }
+    } catch (error) {
+      const errorMsg = error.message || 'Failed to verify code';
+      setError(errorMsg);
+      Toast.show({
+        type: 'error',
+        text1: 'Verification Failed',
+        text2: errorMsg,
+        position: 'bottom'
+      });
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const contextValue = {
+    user,
+    isLoading,
+    error,
+    login,
+    logout,
+    signup,
+    forgotPassword,
+    verifyResetCode,
+    resetPassword,
+    checkTokenExpiry,
+    register,
+    clearError,
+    verifyCode,
+  };
+
   return (
     <AuthContext.Provider
-      value={{
-        user,
-        isLoading,
-        error,
-        login,
-        signup,
-        logout,
-        checkTokenExpiry
-      }}
+      value={contextValue}
     >
       {children}
     </AuthContext.Provider>

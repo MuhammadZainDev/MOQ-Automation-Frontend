@@ -20,6 +20,7 @@ import { router } from 'expo-router';
 import { adminService } from '../../src/services/adminApi';
 import { LineChart, BarChart } from 'react-native-gifted-charts';
 import { LinearGradient } from 'expo-linear-gradient';
+import Toast from 'react-native-toast-message';
 
 // Get screen width for responsive chart
 const screenWidth = Dimensions.get('window').width;
@@ -376,14 +377,18 @@ export default function HomeScreen() {
 
   // Handle logout safely
   const handleLogout = useCallback(async () => {
-    console.log('Logout button pressed');
     try {
       console.log('Calling logout function');
       await logout();
       // Don't navigate here - let the AuthContext handle it
     } catch (error) {
       console.error('Error during logout:', error);
-      Alert.alert('Error', 'An error occurred during logout');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'An error occurred during logout',
+        position: 'bottom'
+      });
     }
   }, [logout]);
   

@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, TextInput, TouchableOpacity, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { ScrollView, View, TextInput, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
 import InactiveAccountModal from '../src/components/InactiveAccountModal';
 import ApprovalModal from '../src/components/ApprovalModal';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 export default function LoginScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -42,7 +43,12 @@ export default function LoginScreen() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please enter email and password',
+        position: 'bottom'
+      });
       return;
     }
 
@@ -76,7 +82,12 @@ export default function LoginScreen() {
       if (error.message && error.message.includes('not active')) {
         setInactiveModalVisible(true);
       } else {
-        Alert.alert('Login Failed', error.message || 'Invalid credentials');
+        Toast.show({
+          type: 'error',
+          text1: 'Login Failed',
+          text2: error.message || 'Invalid credentials',
+          position: 'bottom'
+        });
       }
     } finally {
       setLoading(false);

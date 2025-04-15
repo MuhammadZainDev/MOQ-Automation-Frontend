@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { ScrollView, View, TextInput, TouchableOpacity, Text, StyleSheet, Alert, ActivityIndicator } from 'react-native';
+import { ScrollView, View, TextInput, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../src/context/AuthContext';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Toast from 'react-native-toast-message';
 
 export default function SignupScreen() {
   const [passwordVisible, setPasswordVisible] = useState(false);
@@ -19,17 +20,32 @@ export default function SignupScreen() {
   const handleSignup = async () => {
     // Validate inputs
     if (!name || !email || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please fill in all fields',
+        position: 'bottom'
+      });
       return;
     }
 
     if (password.length < 8) {
-      Alert.alert('Error', 'Password must be at least 8 characters');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Password must be at least 8 characters',
+        position: 'bottom'
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Passwords do not match',
+        position: 'bottom'
+      });
       return;
     }
 
@@ -48,7 +64,12 @@ export default function SignupScreen() {
       }
     } catch (error: any) {
       console.error('Signup error in component:', error);
-      Alert.alert('Signup Failed', error.message || 'Could not create account');
+      Toast.show({
+        type: 'error',
+        text1: 'Signup Failed',
+        text2: error.message || 'Could not create account',
+        position: 'bottom'
+      });
     } finally {
       setLoading(false);
     }

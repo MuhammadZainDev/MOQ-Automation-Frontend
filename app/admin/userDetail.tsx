@@ -8,8 +8,7 @@ import {
   ScrollView,
   TextInput,
   SafeAreaView,
-  StatusBar,
-  Alert
+  StatusBar
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -293,6 +292,26 @@ export default function UserDetailScreen() {
     }
   };
 
+  const confirmUserStatusChange = () => {
+    // Check if user is null
+    if (!user) return;
+    
+    // Show confirmation toast
+    Toast.show({
+      type: 'info',
+      text1: user.isActive ? 'Deactivate User' : 'Activate User',
+      text2: user.isActive 
+        ? `Are you sure you want to deactivate ${user.name}? They will lose access to the platform.`
+        : `Are you sure you want to activate ${user.name}? An email notification will be sent to ${user.email}.`,
+      position: 'bottom',
+      visibilityTime: 4000,
+      autoHide: true,
+      onPress: () => {
+        handleToggleActive();
+      }
+    });
+  };
+
   if (loading) {
     return (
       <CustomLayout>
@@ -496,22 +515,7 @@ export default function UserDetailScreen() {
               styles.statusToggleButton, 
               user.isActive ? styles.statusToggleDeactivate : styles.statusToggleActivate
             ]} 
-            onPress={() => {
-              Alert.alert(
-                user.isActive ? 'Deactivate User' : 'Activate User',
-                user.isActive 
-                  ? `Are you sure you want to deactivate ${user.name}? They will lose access to the platform.`
-                  : `Are you sure you want to activate ${user.name}? An email notification will be sent to ${user.email} informing them of their approval.`,
-                [
-                  { text: 'Cancel', style: 'cancel' },
-                  { 
-                    text: user.isActive ? 'Deactivate' : 'Activate', 
-                    onPress: handleToggleActive,
-                    style: 'destructive'
-                  }
-                ]
-              )
-            }}
+            onPress={confirmUserStatusChange}
           >
             {toggleLoading ? (
               <ActivityIndicator size="small" color="#fff" />

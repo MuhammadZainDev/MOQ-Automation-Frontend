@@ -1,12 +1,49 @@
-import React from 'react';
-import { ScrollView, View, TextInput, TouchableOpacity, Text, StyleSheet } from 'react-native';
+import React, { useState } from 'react';
+import { ScrollView, View, TextInput, TouchableOpacity, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import { Link, router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../src/context/AuthContext';
+import Toast from 'react-native-toast-message';
 
 export default function ForgotPasswordScreen() {
-  const handleSendCode = () => {
-    // Navigate to verification code screen
-    router.push('/verification-code');
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { forgotPassword } = useAuth();
+
+  const handleSendCode = async () => {
+    // Validate email
+    if (!email || !email.includes('@')) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please enter a valid email address',
+        position: 'bottom'
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await forgotPassword(email);
+      
+      if (result && result.success) {
+        // Store email in sessionStorage or pass via params to next screen
+        router.push({
+          pathname: '/verification-code',
+          params: { email }
+        });
+      }
+    } catch (error: any) {
+      console.error('Error requesting reset code:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error.message || 'Failed to send reset code. Please try again.',
+        position: 'bottom'
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -24,11 +61,21 @@ export default function ForgotPasswordScreen() {
             placeholderTextColor="#777"
             keyboardType="email-address"
             autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
           />
         </View>
         
-        <TouchableOpacity style={styles.submitButton} onPress={handleSendCode}>
-          <Text style={styles.submitButtonText}>Send Code</Text>
+        <TouchableOpacity 
+          style={styles.submitButton} 
+          onPress={handleSendCode}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.submitButtonText}>Send Code</Text>
+          )}
         </TouchableOpacity>
       </View>
       

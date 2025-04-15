@@ -229,7 +229,101 @@ export const authService = {
       console.log('Error checking authentication:', error);
       return false;
     }
-  }
+  },
+
+  // Request a password reset code
+  forgotPassword: async (email) => {
+    try {
+      console.log('Requesting password reset for email:', email);
+      
+      const response = await API.post('/auth/forgot-password', { email });
+      
+      return {
+        success: true,
+        message: response.data.message || 'Reset code sent to your email if it exists in our system'
+      };
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      throw { 
+        message: error.response?.data?.message || error.message || 'Error sending reset code' 
+      };
+    }
+  },
+  
+  // Verify a password reset code
+  verifyResetCode: async (email, resetCode) => {
+    try {
+      console.log('Verifying reset code for email:', email);
+      
+      const response = await API.post('/auth/verify-reset-code', { 
+        email, 
+        code: resetCode  // Changed from resetCode to code to match backend API
+      });
+      
+      console.log('API verify response:', response.data);
+      
+      return {
+        success: true,
+        valid: response.data.valid || false,
+        message: response.data.message || 'Code verified successfully'
+      };
+    } catch (error) {
+      console.error('Verify reset code error:', error);
+      throw { 
+        message: error.response?.data?.message || error.message || 'Invalid or expired code' 
+      };
+    }
+  },
+  
+  // Reset password with valid code
+  resetPassword: async (email, resetCode, newPassword) => {
+    try {
+      console.log('Resetting password with params:', {
+        email,
+        code: resetCode,
+        newPasswordLength: newPassword?.length || 0
+      });
+      
+      // Make sure we're using the correct parameter names that the backend expects
+      const requestData = {
+        email,
+        code: resetCode,
+        newPassword  // This is the parameter name expected by the backend
+      };
+      
+      console.log('API request data:', JSON.stringify(requestData));
+      
+      const response = await API.post('/auth/reset-password', requestData);
+      
+      console.log('Reset password API response:', response.data);
+      
+      return {
+        success: true,
+        message: response.data.message || 'Password reset successfully'
+      };
+    } catch (error) {
+      console.error('Reset password error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        message: error.message,
+      });
+      
+      // If we got a 400 error, it likely means one of the parameters is wrong or missing
+      if (error.response?.status === 400) {
+        console.log('Request that caused 400 error:', {
+          url: '/auth/reset-password',
+          email: email,
+          codeLength: resetCode?.length || 0,
+          passwordLength: newPassword?.length || 0
+        });
+      }
+      
+      throw { 
+        message: error.response?.data?.message || error.message || 'Failed to reset password' 
+      };
+    }
+  },
 };
 
 export default API; 
