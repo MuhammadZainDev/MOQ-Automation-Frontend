@@ -1,9 +1,11 @@
 import axios from 'axios';
-import { API_URL } from '@env';
+// Remove the @env import that's causing the error
+// import { API_URL } from '@env';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Axois configuration
-axios.defaults.baseURL = API_URL;
+// Use hardcoded base URL instead of API_URL from env
+axios.defaults.baseURL = 'http://192.168.0.106:4000/api';
 
 // Add auth token to requests if available
 axios.interceptors.request.use(
@@ -80,5 +82,15 @@ export const checkTokenValidity = async () => {
   } catch (error) {
     console.error('Token validation error:', error.response?.data || error);
     return { valid: false };
+  }
+};
+
+export const updateUserName = async (newName) => {
+  try {
+    const response = await axios.patch('/auth/update-name', { newName });
+    return response.data;
+  } catch (error) {
+    console.error('Update name error:', error.response?.data || error);
+    throw new Error(error.response?.data?.message || 'Failed to update name');
   }
 }; 

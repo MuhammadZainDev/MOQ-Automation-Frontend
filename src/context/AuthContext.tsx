@@ -30,6 +30,7 @@ type AuthContextType = {
   register: (name: string, email: string, password: string) => Promise<any>;
   clearError: () => void;
   verifyCode: (email: string, code: string) => Promise<any>;
+  updateName: (newName: string) => Promise<any>;
 };
 
 // Create the auth context with default values
@@ -47,6 +48,7 @@ const AuthContext = createContext<AuthContextType>({
   register: async () => ({ success: false }),
   clearError: () => {},
   verifyCode: async () => ({ success: false }),
+  updateName: async () => ({ success: false }),
 });
 
 // Auth provider props
@@ -497,6 +499,47 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const updateName = async (newName: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      console.log('Starting name update process with new name:', newName);
+      const response = await authApi.updateUserName(newName);
+      console.log('Name update response received:', response);
+      
+      if (response && response.user) {
+        console.log('Name update successful, updating user data:', response.user);
+        setUser(response.user);
+        
+        Toast.show({
+          type: 'success',
+          text1: 'Name Updated',
+          text2: 'Your profile name has been updated successfully!',
+          position: 'bottom'
+        });
+        
+        return { success: true };
+      } else {
+        console.log('Invalid response format:', response);
+        throw new Error('Invalid response format from server');
+      }
+    } catch (error: any) {
+      const errorMsg = error.message || 'Name update failed';
+      setError(errorMsg);
+      console.error('Name update error details:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Update Failed',
+        text2: errorMsg,
+        position: 'bottom'
+      });
+      return { success: false, error: errorMsg };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const contextValue = {
     user,
     isLoading,
@@ -511,6 +554,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     register,
     clearError,
     verifyCode,
+    updateName,
   };
 
   return (
