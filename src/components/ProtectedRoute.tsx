@@ -16,7 +16,7 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const hasRedirected = useRef(false);
 
   // Public routes that don't require authentication
-  const publicRoutes = ['/login', '/signup', '/forgot-password', '/verification-code', '/reset-password'];
+  const publicRoutes = ['/login', '/signup', '/forgot-password', '/verification-code', '/reset-password', '/welcome1', '/welcome2'];
 
   useEffect(() => {
     // Only check on initial mount to avoid loops

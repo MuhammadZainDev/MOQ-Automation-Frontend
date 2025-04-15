@@ -734,8 +734,8 @@ export default function HomeScreen() {
               <View style={styles.notificationHeader}>
                 <Text style={styles.dateText}>
                   Monthly Summary for {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}
-                </Text>
-              </View>
+              </Text>
+            </View>
               <View style={styles.notificationContent}>
                 <Text style={styles.notificationText}>
                   In {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}, your <Text style={styles.blueText}>total stats</Text> 
