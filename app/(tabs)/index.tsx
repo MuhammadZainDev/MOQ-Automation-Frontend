@@ -30,11 +30,8 @@ type UserAnalyticsData = {
   stats: number;
   views: number;
   videos: number;
-  watch_hours: number;
   premium_country_views: number;
-  subscribers: number;
   posts: number;
-  likes: number;
   entries?: Array<{
     stats: number;
     created_at?: string;
@@ -47,9 +44,7 @@ type DailyAnalyticsData = {
   stats: number;
   views: number;
   videos: number;
-  subscribers: number;
-  watch_hours: number;
-  likes: number;
+  premium_country_views: number;
 };
 
 // Utility function to format numbers in a human-readable way (1k, 1.2M, etc)
@@ -78,20 +73,15 @@ export default function HomeScreen() {
     stats: 0,
     views: 0,
     videos: 0,
-    watch_hours: 0,
     premium_country_views: 0,
-    subscribers: 0,
-    posts: 0,
-    likes: 0
+    posts: 0
   });
   // Store daily analytics separately
   const [dailyAnalyticsData, setDailyAnalyticsData] = useState<DailyAnalyticsData>({
     stats: 0,
     views: 0,
     videos: 0,
-    subscribers: 0,
-    watch_hours: 0,
-    likes: 0
+    premium_country_views: 0
   });
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   
@@ -243,27 +233,39 @@ export default function HomeScreen() {
 
   // Update today's analytics with actual data - converted to useCallback
   const updateTodaysAnalytics = useCallback((totalData: UserAnalyticsData) => {
-    // Instead of using total data, we need to filter for today's entries only
+    // Initialize today's values to 0
     let todayStats = 0;
     let todayViews = 0;
     let todayVideos = 0;
-    let todaySubscribers = 0;
-    let todayWatchHours = 0;
-    let todayLikes = 0;
+    let todayPremiumViews = 0;
     
     // Check if entries exist
     if (totalData.entries && Array.isArray(totalData.entries) && totalData.entries.length > 0) {
-      // Get today's date in YYYY-MM-DD format
+      // Get today's date - we'll compare only year, month, and day
       const today = new Date();
-      const todayStr = today.toISOString().split('T')[0]; // Get YYYY-MM-DD part
+      const todayYear = today.getFullYear();
+      const todayMonth = today.getMonth();
+      const todayDay = today.getDate();
       
-      console.log('Looking for entries with today\'s date:', todayStr);
+      console.log(`Looking for entries matching today's date: ${today.toLocaleDateString()}`);
       
-      // Find entries that match today's date
+      // Find entries that match today's date by comparing year, month, and day
       const todayEntries = totalData.entries.filter(entry => {
         if (entry.created_at) {
-          const entryDateStr = entry.created_at.toString();
-          return entryDateStr.startsWith(todayStr);
+          try {
+            // Parse the created_at date string
+            const entryDate = new Date(entry.created_at);
+            
+            // Compare year, month, and day
+            return (
+              entryDate.getFullYear() === todayYear &&
+              entryDate.getMonth() === todayMonth &&
+              entryDate.getDate() === todayDay
+            );
+          } catch (e) {
+            console.error("Error parsing entry date:", e);
+            return false;
+          }
         }
         return false;
       });
@@ -275,57 +277,32 @@ export default function HomeScreen() {
           todayStats += Number(entry.stats || 0);
           todayViews += Number(entry.views || 0);
           todayVideos += Number(entry.videos || 0);
-          todaySubscribers += Number(entry.subscribers || 0); // Use actual subscribers field
-          todayWatchHours += Number(entry.watch_hours || 0);
-          todayLikes += Number(entry.stats || 0); // Using stats as likes
+          todayPremiumViews += Number(entry.premium_country_views || 0);
         });
       } else {
-        console.log('No entries found for today, using most recent entry');
-        // If no entries for today, use the most recent entry as today's data
-        const sortedEntries = [...totalData.entries].sort((a, b) => {
-          if (!a.created_at) return 1;
-          if (!b.created_at) return -1;
-          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        });
-        
-        if (sortedEntries.length > 0) {
-          const mostRecent = sortedEntries[0];
-          todayStats = Number(mostRecent.stats || 0);
-          todayViews = Number(mostRecent.views || 0);
-          todayVideos = Number(mostRecent.videos || 0);
-          todaySubscribers = Number(mostRecent.subscribers || 0); // Use actual subscribers field
-          todayWatchHours = Number(mostRecent.watch_hours || 0);
-          todayLikes = Number(mostRecent.stats || 0); // Using stats as likes
-        }
+        // No entries for today - show zeros instead of using old data
+        console.log('No entries found for today - showing zeros');
+        // All values remain at 0 (already initialized above)
       }
     } else {
-      // If no entries at all, use 10% of total as today's value (for display purposes)
-      console.log('No entries found, using percentage of total');
-      todayStats = Math.round((totalData.stats || 0) * 0.1);
-      todayViews = Math.round((totalData.views || 0) * 0.1);
-      todayVideos = Math.round((totalData.videos || 0) * 0.1);
-      todaySubscribers = Math.round((totalData.subscribers || 0) * 0.1);
-      todayWatchHours = Math.round((totalData.watch_hours || 0) * 0.1);
-      todayLikes = Math.round((totalData.likes || 0) * 0.1);
+      // No entries at all - also show zeros
+      console.log('No entries found at all - showing zeros');
+      // All values remain at 0 (already initialized above)
     }
     
-    // Set today's analytics with the calculated values
+    // Set today's analytics with the calculated values (zeros if no today's data)
     setDailyAnalyticsData({
       stats: todayStats,
       views: todayViews,
       videos: todayVideos,
-      subscribers: todaySubscribers,
-      watch_hours: todayWatchHours,
-      likes: todayLikes
+      premium_country_views: todayPremiumViews
     });
     
     console.log('Updated today\'s analytics:', {
       stats: todayStats,
       views: todayViews,
       videos: todayVideos,
-      subscribers: todaySubscribers,
-      watch_hours: todayWatchHours,
-      likes: todayLikes
+      premium_country_views: todayPremiumViews
     });
   }, []);
   
@@ -394,19 +371,9 @@ export default function HomeScreen() {
   
   // Calculate detailed analytics based on the fetched data
   const detailedAnalytics = {
-    subscribers: {
-      value: analyticsData.subscribers || 0,
-      average: ((analyticsData.subscribers || 0) / 28).toFixed(1),
-      trend: 'neutral'
-    },
     views: {
       value: analyticsData.views || 0,
       average: ((analyticsData.views || 0) / 28).toFixed(1),
-      trend: 'neutral'
-    },
-    watchHours: {
-      value: analyticsData.watch_hours || 0,
-      average: ((analyticsData.watch_hours || 0) / 28).toFixed(1),
       trend: 'neutral'
     }
   };
@@ -478,14 +445,14 @@ export default function HomeScreen() {
         
             <View style={styles.analyticsBox}>
               <View style={styles.analyticsHeader}>
-                <Text style={styles.analyticsTitle}>Subs</Text>
+                <Text style={styles.analyticsTitle}>Videos</Text>
                 <Ionicons name="today-outline" size={18} color="#777" />
               </View>
               <Text style={styles.analyticsValue}>
                 {isLoadingAnalytics ? (
                   <ActivityIndicator size="small" color="#DF0000" />
                 ) : (
-                  formatNumber(dailyAnalyticsData.subscribers)
+                  formatNumber(dailyAnalyticsData.videos)
                 )}
               </Text>
               <View style={styles.analyticsFooter}>
@@ -514,50 +481,14 @@ export default function HomeScreen() {
             
             <View style={styles.analyticsBox}>
               <View style={styles.analyticsHeader}>
-                <Text style={styles.analyticsTitle}>Videos</Text>
+                <Text style={styles.analyticsTitle}>Premium Views</Text>
                 <Ionicons name="today-outline" size={18} color="#777" />
               </View>
               <Text style={styles.analyticsValue}>
                 {isLoadingAnalytics ? (
                   <ActivityIndicator size="small" color="#DF0000" />
                 ) : (
-                  formatNumber(dailyAnalyticsData.videos)
-                )}
-              </Text>
-              <View style={styles.analyticsFooter}>
-                <Text style={styles.analyticsTrend}>Today</Text>
-              </View>
-            </View>
-          </View>
-          
-          <View style={styles.analyticsRow}>
-            <View style={styles.analyticsBox}>
-              <View style={styles.analyticsHeader}>
-                <Text style={styles.analyticsTitle}>Watch Hours</Text>
-                <Ionicons name="today-outline" size={18} color="#777" />
-              </View>
-              <Text style={styles.analyticsValue}>
-                {isLoadingAnalytics ? (
-                  <ActivityIndicator size="small" color="#DF0000" />
-                ) : (
-                  formatNumber(dailyAnalyticsData.watch_hours)
-                )}
-              </Text>
-              <View style={styles.analyticsFooter}>
-                <Text style={styles.analyticsTrend}>Today</Text>
-              </View>
-            </View>
-            
-            <View style={styles.analyticsBox}>
-              <View style={styles.analyticsHeader}>
-                <Text style={styles.analyticsTitle}>Likes</Text>
-                <Ionicons name="today-outline" size={18} color="#777" />
-              </View>
-              <Text style={styles.analyticsValue}>
-                {isLoadingAnalytics ? (
-                  <ActivityIndicator size="small" color="#DF0000" />
-                ) : (
-                  formatNumber(dailyAnalyticsData.likes)
+                  formatNumber(dailyAnalyticsData.premium_country_views)
                 )}
               </Text>
               <View style={styles.analyticsFooter}>
@@ -654,16 +585,16 @@ export default function HomeScreen() {
                       </View>
                     </View>
                     
-                    {/* Subscribers Card */}
+                    {/* Videos Card */}
                     <View style={styles.detailedCard}>
-                      <Text style={styles.cardTitle}>Subscribers</Text>
-                      <Text style={styles.cardValue}>{formatNumber(analyticsData.subscribers || 0)}</Text>
+                      <Text style={styles.cardTitle}>Videos</Text>
+                      <Text style={styles.cardValue}>{formatNumber(analyticsData.videos || 0)}</Text>
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
-                        <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.subscribers || 0) / 28))} / day</Text>
-                      </View>
+                        <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.videos || 0) / 28))} / day</Text>
                       </View>
                     </View>
+                  </View>
                     
                   <View style={styles.detailedCardsRow}>
                     {/* Views Card */}
@@ -676,35 +607,13 @@ export default function HomeScreen() {
                       </View>
                     </View>
                     
-                    {/* Videos Card */}
+                    {/* Premium Views Card */}
                     <View style={styles.detailedCard}>
-                      <Text style={styles.cardTitle}>Videos</Text>
-                      <Text style={styles.cardValue}>{formatNumber(analyticsData.videos || 0)}</Text>
+                      <Text style={styles.cardTitle}>Premium Views</Text>
+                      <Text style={styles.cardValue}>{formatNumber(analyticsData.premium_country_views || 0)}</Text>
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
-                        <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.videos || 0) / 28))} / day</Text>
-            </View>
-          </View>
-        </View>
-        
-                  <View style={styles.detailedCardsRow}>
-                    {/* Watch Hours Card */}
-                    <View style={styles.detailedCard}>
-                      <Text style={styles.cardTitle}>Watch hours</Text>
-                      <Text style={styles.cardValue}>{formatNumber(analyticsData.watch_hours || 0)}</Text>
-                      <View style={styles.averageContainer}>
-                        <Text style={styles.averageLabel}>Average</Text>
-                        <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.watch_hours || 0) / 28))} / day</Text>
-                      </View>
-                    </View>
-                    
-                    {/* Likes Card */}
-                    <View style={styles.detailedCard}>
-                      <Text style={styles.cardTitle}>Likes</Text>
-                      <Text style={styles.cardValue}>{formatNumber(analyticsData.likes || 0)}</Text>
-                      <View style={styles.averageContainer}>
-                        <Text style={styles.averageLabel}>Average</Text>
-                        <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.likes || 0) / 28))} / day</Text>
+                        <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.premium_country_views || 0) / 28))} / day</Text>
                       </View>
                     </View>
                   </View>

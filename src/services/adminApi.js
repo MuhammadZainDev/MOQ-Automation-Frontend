@@ -61,13 +61,57 @@ export const adminService = {
       // If isActive not provided, toggle the current status
       const newStatus = isActive !== undefined ? isActive : !userDetails?.data?.isActive;
       
+      // Toggle active status immediately - no email dependency
       const response = await API.post('/auth/toggle-active', {
         userId: parseInt(userId, 10),
-        isActive: newStatus
+        isActive: newStatus,
+        skipEmail: false // Keep default email behavior for backwards compatibility
       });
+      
       return response.data;
     } catch (error) {
       console.error('Error toggling user status:', error);
+      throw error;
+    }
+  },
+
+  // Toggle user active status with immediate activation and separate email handling
+  toggleUserActiveImmediate: async (userId, isActive) => {
+    try {
+      const userDetails = await adminService.getUserById(userId);
+      
+      // If isActive not provided, toggle the current status
+      const newStatus = isActive !== undefined ? isActive : !userDetails?.data?.isActive;
+      
+      // First, update user status without email (immediate activation)
+      const response = await API.post('/auth/toggle-active', {
+        userId: parseInt(userId, 10),
+        isActive: newStatus,
+        skipEmail: true // Skip email in the main activation process
+      });
+      
+      // If successful and user was activated, trigger email separately
+      if (response.data.success && newStatus === true) {
+        try {
+          // There is no separate endpoint for email, so use toggle-active with skipEmail=false
+          // But don't wait for this to complete - do it in the background
+          API.post('/auth/toggle-active', {
+            userId: parseInt(userId, 10),
+            isActive: true, // Already active, just sending email
+            skipEmail: false // Send email this time
+          }).catch(emailError => {
+            // Log error but don't throw - we don't want this to affect the UI flow
+            console.log('Email notification might have failed, but user is activated');
+          });
+        } catch (emailError) {
+          console.log('Error with email notification, but user is still activated');
+          // Continue even if email fails, user is already activated
+        }
+      }
+      
+      return response.data;
+    } catch (error) {
+      console.error('Error toggling user status immediately:', error);
       throw error;
     }
   },
@@ -136,9 +180,7 @@ export const adminService = {
           stats: '',
           views: '',
           videos: '',
-          watch_hours: '',
-          premium_country_views: '',
-          subscribers: ''
+          premium_country_views: ''
         }
       };
     }
@@ -201,9 +243,7 @@ export const adminService = {
             stats: enhancedData.data.stats || 0,
             views: enhancedData.data.views || 0,
             videos: enhancedData.data.videos || 0,
-            watch_hours: enhancedData.data.watch_hours || 0,
             premium_country_views: enhancedData.data.premium_country_views || 0,
-            subscribers: enhancedData.data.subscribers || 0,
             created_at: isoDate
           }];
           
@@ -222,9 +262,7 @@ export const adminService = {
           stats: 100,
           views: 50,
           videos: 5,
-          watch_hours: 25,
           premium_country_views: 10,
-          subscribers: 10,
           posts: 5,
           likes: 100,
           // Add a fake entry for the current month
@@ -232,9 +270,7 @@ export const adminService = {
             stats: 100, 
             views: 50,
             videos: 5,
-            watch_hours: 25,
             premium_country_views: 10,
-            subscribers: 10,
             created_at: new Date().toISOString()
           }]
         }

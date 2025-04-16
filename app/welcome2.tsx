@@ -100,18 +100,18 @@ export default function WelcomeScreen2() {
               inputRange: [0, 1],
               outputRange: [0.8, 1]
             })}] }]}>
-              <Ionicons name="people-outline" size={32} color="#DF0000" />
-              <Text style={styles.featureTitle}>Subscribers</Text>
-              <Text style={styles.featureDescription}>Monitor your subscriber growth over time</Text>
+              <Ionicons name="stats-chart-outline" size={32} color="#DF0000" />
+              <Text style={styles.featureTitle}>Stats</Text>
+              <Text style={styles.featureDescription}>Track your overall performance metrics</Text>
             </Animated.View>
             
             <Animated.View style={[styles.featureBox, { opacity: fadeAnim3, transform: [{ scale: fadeAnim3.interpolate({
               inputRange: [0, 1],
               outputRange: [0.8, 1]
             })}] }]}>
-              <Ionicons name="time-outline" size={32} color="#DF0000" />
-              <Text style={styles.featureTitle}>Watch Time</Text>
-              <Text style={styles.featureDescription}>See how long viewers engage with your videos</Text>
+              <Ionicons name="ribbon-outline" size={32} color="#DF0000" />
+              <Text style={styles.featureTitle}>Premium Views</Text>
+              <Text style={styles.featureDescription}>See views from premium countries</Text>
             </Animated.View>
             
             <Animated.View style={[styles.featureBox, { opacity: fadeAnim4, transform: [{ scale: fadeAnim4.interpolate({

@@ -56,22 +56,19 @@ export default function GraphsScreen() {
   // Generate mock data if we don't have enough real data
   const generateMockData = () => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun'];
-    let viewsData, subscribersData;
+    let viewsData;
     
     if (analytics?.entries && analytics.entries.length >= 6) {
       // Use real data if available
       viewsData = analytics.entries.slice(0, 6).map(entry => entry.views || 0);
-      subscribersData = analytics.entries.slice(0, 6).map(entry => entry.subscribers || 0);
     } else {
       // Generate mock data as fallback
       viewsData = [20, 45, 28, 80, 99, 43];
-      subscribersData = [5, 10, 12, 15, 20, 25]; 
     }
     
     return {
       months,
       viewsData,
-      subscribersData,
       pieData: [
         {
           name: "Views",
@@ -81,16 +78,16 @@ export default function GraphsScreen() {
           legendFontSize: 15
         },
         {
-          name: "Subscribers",
-          population: analytics?.subscribers || 50,
-          color: "#F39C12",
+          name: "Videos",
+          population: analytics?.videos || 25,
+          color: "#3498DB",
           legendFontColor: "#FFF",
           legendFontSize: 15
         },
         {
-          name: "Videos",
-          population: analytics?.videos || 25,
-          color: "#3498DB",
+          name: "Premium Views",
+          population: analytics?.premium_country_views || 15,
+          color: "#F39C12",
           legendFontColor: "#FFF",
           legendFontSize: 15
         }
@@ -128,7 +125,7 @@ export default function GraphsScreen() {
     labels: data.months,
     datasets: [
       {
-        data: data.subscribersData
+        data: data.viewsData
       }
     ]
   };
@@ -215,7 +212,7 @@ export default function GraphsScreen() {
 
         {selectedChart === 'bar' && (
           <>
-            <Text style={styles.chartTitle}>Monthly Subscribers</Text>
+            <Text style={styles.chartTitle}>Monthly Views</Text>
             <BarChart
               data={barChartData}
               width={width - 40}
@@ -258,21 +255,21 @@ export default function GraphsScreen() {
           </View>
           
           <View style={styles.statItem}>
-            <Ionicons name="people-outline" size={24} color="#DF0000" />
-            <Text style={styles.statValue}>{analytics?.subscribers || 0}</Text>
-            <Text style={styles.statLabel}>Subscribers</Text>
-          </View>
-          
-          <View style={styles.statItem}>
             <Ionicons name="videocam-outline" size={24} color="#DF0000" />
             <Text style={styles.statValue}>{analytics?.videos || 0}</Text>
             <Text style={styles.statLabel}>Videos</Text>
           </View>
           
           <View style={styles.statItem}>
-            <Ionicons name="time-outline" size={24} color="#DF0000" />
-            <Text style={styles.statValue}>{analytics?.watch_hours || 0}</Text>
-            <Text style={styles.statLabel}>Watch Hours</Text>
+            <Ionicons name="globe-outline" size={24} color="#DF0000" />
+            <Text style={styles.statValue}>{analytics?.premium_country_views || 0}</Text>
+            <Text style={styles.statLabel}>Premium Views</Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <Ionicons name="stats-chart-outline" size={24} color="#DF0000" />
+            <Text style={styles.statValue}>{analytics?.stats || 0}</Text>
+            <Text style={styles.statLabel}>Stats</Text>
           </View>
         </View>
       </View>

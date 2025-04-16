@@ -8,17 +8,16 @@ import { LinearGradient } from 'expo-linear-gradient';
 // Define types for analytics data
 type AnalyticsEntry = {
   views?: number;
-  watch_hours?: number;
-  subscribers?: number;
+  videos?: number;
   stats?: number;
+  premium_country_views?: number;
   created_at?: string;
   [key: string]: any;
 };
 
 type AnalyticsData = {
   views?: number;
-  watch_hours?: number;
-  subscribers?: number;
+  videos?: number;
   stats?: number;
   premium_country_views?: number;
   entries?: AnalyticsEntry[];

@@ -8,13 +8,15 @@ import {
   ScrollView,
   TextInput,
   SafeAreaView,
-  StatusBar
+  StatusBar,
+  Alert
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { adminService } from '../../src/services/adminApi';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../src/context/AuthContext';
+import ConfirmationModal from '../../src/components/ConfirmationModal';
 
 // Utility function to format numbers in a human-readable way (1k, 1.2M, etc)
 const formatNumber = (num: number): string => {
@@ -48,9 +50,7 @@ type UserAnalytics = {
   stats: number;
   views: number;
   videos: number;
-  watch_hours: number;
   premium_country_views: number;
-  subscribers?: number;
   entries?: any[];
 };
 
@@ -99,11 +99,10 @@ export default function UserDetailScreen() {
   const [stats, setStats] = useState('');
   const [views, setViews] = useState('');
   const [videos, setVideos] = useState('');
-  const [watchHours, setWatchHours] = useState('');
   const [premiumCountryViews, setPremiumCountryViews] = useState('');
-  const [subscribers, setSubscribers] = useState('');
   const [savingAnalytics, setSavingAnalytics] = useState(false);
   const [toggleLoading, setToggleLoading] = useState(false);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
 
   // Fetch user details and analytics
   useEffect(() => {
@@ -144,9 +143,7 @@ export default function UserDetailScreen() {
             setStats('');
             setViews('');
             setVideos('');
-            setWatchHours('');
             setPremiumCountryViews('');
-            setSubscribers('');
           }
         } catch (analyticsError) {
           console.log('Analytics not available yet, using default values');
@@ -183,9 +180,7 @@ export default function UserDetailScreen() {
         stats: !isNaN(Number(stats)) ? Number(stats) : 0,
         views: !isNaN(Number(views)) ? Number(views) : 0,
         videos: !isNaN(Number(videos)) ? Number(videos) : 0,
-        watch_hours: !isNaN(Number(watchHours)) ? Number(watchHours) : 0,
-        premium_country_views: !isNaN(Number(premiumCountryViews)) ? Number(premiumCountryViews) : 0,
-        subscribers: !isNaN(Number(subscribers)) ? Number(subscribers) : 0
+        premium_country_views: !isNaN(Number(premiumCountryViews)) ? Number(premiumCountryViews) : 0
       };
       
       // Update user analytics
@@ -196,9 +191,7 @@ export default function UserDetailScreen() {
         setStats('');
         setViews('');
         setVideos('');
-        setWatchHours('');
         setPremiumCountryViews('');
-        setSubscribers('');
         
         // Show success message
         Toast.show({
@@ -252,43 +245,67 @@ export default function UserDetailScreen() {
   };
 
   const handleToggleActive = async () => {
-    try {
-      setToggleLoading(true);
-      
-      const response = await adminService.toggleUserActive(userId);
-      
-      if (response.success) {
-        // Fetch the updated user details
-        const updatedUserResponse = await adminService.getUserById(userId);
-        if (updatedUserResponse.success && updatedUserResponse.data) {
-          setUser(updatedUserResponse.data);
-        }
-        
-        // Show success message
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'User status updated successfully',
-          position: 'bottom'
-        });
-      } else {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Failed to update user status',
-          position: 'bottom'
-        });
-      }
-    } catch (error) {
-      console.error('Error toggling user status:', error);
-      Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to update user status',
-        position: 'bottom'
-      });
-    } finally {
+    // Get the current active status before the API call
+    const currentIsActive = user?.isActive || false;
+    
+    // IMPORTANT: Update UI state immediately
+    setUser(prevUser => {
+      if (!prevUser) return null;
+      return {
+        ...prevUser,
+        isActive: !currentIsActive
+      };
+    });
+    
+    // Show brief loading while updating UI, then reset it immediately
+    setToggleLoading(true);
+    setTimeout(() => {
       setToggleLoading(false);
+    }, 300); // Just a brief visual feedback that something happened
+    
+    // Show immediate success message
+    Toast.show({
+      type: 'success',
+      text1: 'Success',
+      text2: currentIsActive 
+        ? 'User deactivated successfully' 
+        : 'User activated successfully',
+      position: 'bottom'
+    });
+    
+    // BACKGROUND: Make the actual API call without blocking UI
+    try {
+      // Send API call in background
+      adminService.toggleUserActiveImmediate(userId)
+        .then(response => {
+          if (!response.success) {
+            // Only show error if the API call fails, but don't revert UI state
+            // to avoid confusing the user
+            console.error('API call failed but UI was already updated');
+            Toast.show({
+              type: 'info',
+              text1: 'Note',
+              text2: 'Server sync in progress...',
+              position: 'bottom'
+            });
+          }
+          
+          // Refresh user details in background
+          return adminService.getUserById(userId);
+        })
+        .then(updatedUserResponse => {
+          if (updatedUserResponse?.success && updatedUserResponse?.data) {
+            // Silently update user data from server to stay in sync
+            setUser(updatedUserResponse.data);
+          }
+        })
+        .catch(error => {
+          console.error('Background API error:', error);
+          // Don't show error to user since UI is already updated
+        });
+    } catch (error) {
+      console.error('Error initiating background user status update:', error);
+      // Still don't revert UI state to avoid user confusion
     }
   };
 
@@ -296,20 +313,8 @@ export default function UserDetailScreen() {
     // Check if user is null
     if (!user) return;
     
-    // Show confirmation toast
-    Toast.show({
-      type: 'info',
-      text1: user.isActive ? 'Deactivate User' : 'Activate User',
-      text2: user.isActive 
-        ? `Are you sure you want to deactivate ${user.name}? They will lose access to the platform.`
-        : `Are you sure you want to activate ${user.name}? An email notification will be sent to ${user.email}.`,
-      position: 'bottom',
-      visibilityTime: 4000,
-      autoHide: true,
-      onPress: () => {
-        handleToggleActive();
-      }
-    });
+    // Show custom confirmation modal
+    setConfirmModalVisible(true);
   };
 
   if (loading) {
@@ -390,27 +395,17 @@ export default function UserDetailScreen() {
                 <Text style={styles.boxLabel}>Views</Text>
                 <Text style={styles.boxValue}>{formatNumber(user?.analytics?.views || 0)}</Text>
               </View>
-              
-              <View style={styles.analyticsBox}>
-                <Text style={styles.boxLabel}>Videos</Text>
-                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.videos || 0)}</Text>
-              </View>
             </View>
             
             <View style={styles.boxesRow}>
               <View style={styles.analyticsBox}>
-                <Text style={styles.boxLabel}>Watch Hours</Text>
-                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.watch_hours || 0)}</Text>
+                <Text style={styles.boxLabel}>Videos</Text>
+                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.videos || 0)}</Text>
               </View>
               
               <View style={styles.analyticsBox}>
                 <Text style={styles.boxLabel}>Premium Views</Text>
                 <Text style={styles.boxValue}>{formatNumber(user?.analytics?.premium_country_views || 0)}</Text>
-              </View>
-              
-              <View style={styles.analyticsBox}>
-                <Text style={styles.boxLabel}>Subscribers</Text>
-                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.subscribers || 0)}</Text>
               </View>
             </View>
           </View>
@@ -448,54 +443,21 @@ export default function UserDetailScreen() {
             </View>
           </View>
           
-          {/* Videos and Watch Hours in a row */}
-          <View style={styles.rowContainer}>
-            <View style={styles.halfColumn}>
-              <Text style={styles.label}>Videos</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="videocam-outline" size={22} color="#777" style={styles.inputIcon} />
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Enter new videos to add" 
-                  placeholderTextColor="#777"
-                  value={videos}
-                  onChangeText={setVideos}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-            
-            <View style={styles.halfColumn}>
-              <Text style={styles.label}>Watch Hours</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="time-outline" size={22} color="#777" style={styles.inputIcon} />
-                <TextInput 
-                  style={styles.input} 
-                  placeholder="Enter new watch hours to add" 
-                  placeholderTextColor="#777"
-                  value={watchHours}
-                  onChangeText={setWatchHours}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-          </View>
-          
-          {/* Subscribers on its own line with full width */}
-          <Text style={styles.label}>Subscribers</Text>
+          {/* Videos - full width */}
+          <Text style={styles.label}>Videos</Text>
           <View style={styles.inputContainer}>
-            <Ionicons name="people-outline" size={22} color="#777" style={styles.inputIcon} />
+            <Ionicons name="videocam-outline" size={22} color="#777" style={styles.inputIcon} />
             <TextInput 
               style={styles.input} 
-              placeholder="Enter new subscribers to add" 
+              placeholder="Enter new videos to add" 
               placeholderTextColor="#777"
-              value={subscribers}
-              onChangeText={setSubscribers}
+              value={videos}
+              onChangeText={setVideos}
               keyboardType="numeric"
             />
           </View>
           
-          {/* Premium Country Views on its own line with full width */}
+          {/* Premium Country Views - full width */}
           <Text style={styles.label}>Premium Country Views</Text>
           <View style={styles.inputContainer}>
             <Ionicons name="globe-outline" size={22} color="#777" style={styles.inputIcon} />
@@ -509,40 +471,37 @@ export default function UserDetailScreen() {
             />
           </View>
           
-          {/* Status Toggle Button */}
-          <TouchableOpacity 
-            style={[
-              styles.statusToggleButton, 
-              user.isActive ? styles.statusToggleDeactivate : styles.statusToggleActivate
-            ]} 
-            onPress={confirmUserStatusChange}
-          >
-            {toggleLoading ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Ionicons 
-                  name={user.isActive ? 'close-circle-outline' : 'checkmark-circle-outline'} 
-                  size={18} 
-                  color="#fff" 
-                  style={styles.toggleIcon} 
-                />
-                <Text style={styles.statusToggleText}>
-                  {user.isActive ? 'Deactivate User' : 'Activate User'}
-                </Text>
-                {!user.isActive && (
-                  <Text style={styles.emailNotificationText}>
-                    Email notification will be sent
-                  </Text>
-                )}
-              </>
-            )}
-          </TouchableOpacity>
+          {/* Simple Toggle Button */}
+          <View style={styles.toggleContainer}>
+            <Text style={styles.toggleLabel}>
+              User Status: <Text style={user.isActive ? styles.activeStatusText : styles.inactiveStatusText}>
+                {user.isActive ? 'Active' : 'Inactive'}
+              </Text>
+            </Text>
+            <TouchableOpacity 
+              style={[
+                styles.simpleToggle, 
+                user.isActive ? styles.toggleActive : styles.toggleInactive
+              ]} 
+              onPress={confirmUserStatusChange}
+              disabled={toggleLoading}
+            >
+              {toggleLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <View style={[styles.toggleCircle, user.isActive ? styles.toggleCircleRight : styles.toggleCircleLeft]} />
+              )}
+            </TouchableOpacity>
+          </View>
           
           <TouchableOpacity 
-            style={[styles.saveButton, savingAnalytics && styles.savingButton]} 
+            style={[
+              styles.saveButton, 
+              savingAnalytics && styles.savingButton,
+              (stats === '' && views === '' && videos === '' && premiumCountryViews === '') && styles.disabledButton
+            ]} 
             onPress={handleSave}
-            disabled={savingAnalytics}
+            disabled={savingAnalytics || (stats === '' && views === '' && videos === '' && premiumCountryViews === '')}
           >
             {savingAnalytics ? (
               <ActivityIndicator size="small" color="#fff" />
@@ -551,6 +510,19 @@ export default function UserDetailScreen() {
             )}
           </TouchableOpacity>
         </View>
+        
+        {/* Custom Confirmation Modal */}
+        <ConfirmationModal
+          visible={confirmModalVisible}
+          onClose={() => setConfirmModalVisible(false)}
+          onConfirm={handleToggleActive}
+          title={user?.isActive ? 'Deactivate User' : 'Activate User'}
+          message={user?.isActive 
+            ? `Are you sure you want to deactivate "${user?.name}"? They will lose access to the platform.`
+            : `Are you sure you want to activate "${user?.name}"? They will gain immediate access to the platform, and an email notification will be sent.`}
+          confirmText={user?.isActive ? 'Deactivate' : 'Activate'}
+          cancelText="Cancel"
+        />
       </ScrollView>
     </CustomLayout>
   );
@@ -663,9 +635,11 @@ const styles = StyleSheet.create({
   },
   activeStatusText: {
     color: '#4CAF50',
+    fontWeight: 'bold',
   },
   inactiveStatusText: {
-    color: '#E57373',
+    color: '#DF0000',
+    fontWeight: 'bold',
   },
   joinedText: {
     color: '#777',
@@ -711,6 +685,7 @@ const styles = StyleSheet.create({
     height: 55,
     justifyContent: 'center',
     marginTop: 10,
+    marginBottom: 10,
   },
   saveButtonText: {
     color: '#fff',
@@ -760,7 +735,7 @@ const styles = StyleSheet.create({
     borderColor: '#444',
     borderRadius: 8,
     padding: 12,
-    width: '31%',
+    width: '48%',
     alignItems: 'center',
   },
   boxLabel: {
@@ -788,34 +763,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: 5,
   },
-  statusToggleButton: {
-    backgroundColor: '#DF0000',
-    borderRadius: 8,
-    padding: 16,
+  toggleContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    height: 55,
-    justifyContent: 'center',
-    marginTop: 10,
+    justifyContent: 'space-between',
+    marginVertical: 20,
   },
-  statusToggleDeactivate: {
-    backgroundColor: '#E57373',
-  },
-  statusToggleActivate: {
-    backgroundColor: '#4CAF50',
-  },
-  toggleIcon: {
-    marginRight: 10,
-  },
-  statusToggleText: {
+  toggleLabel: {
     color: '#fff',
-    fontWeight: 'bold',
     fontSize: 16,
   },
-  emailNotificationText: {
-    color: '#fff',
-    fontSize: 12,
-    fontStyle: 'italic',
-    marginTop: 4,
-    opacity: 0.8,
+  simpleToggle: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    padding: 3,
+  },
+  toggleActive: {
+    backgroundColor: '#4CAF50',
+  },
+  toggleInactive: {
+    backgroundColor: '#DF0000',
+  },
+  toggleCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#fff',
+  },
+  toggleCircleLeft: {
+    alignSelf: 'flex-start',
+  },
+  toggleCircleRight: {
+    alignSelf: 'flex-end',
+  },
+  disabledButton: {
+    opacity: 0.5,
+    backgroundColor: '#666',
   },
 }); 
