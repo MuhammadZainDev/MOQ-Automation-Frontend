@@ -12,6 +12,7 @@ type AnalyticsEntry = {
   revenue?: number;
   premium_country_views?: number;
   created_at?: string;
+  revenue_type?: string;
   [key: string]: any;
 };
 
@@ -30,6 +31,7 @@ type HistoryItem = {
   revenue: number;
   status: string;
   source: string;
+  revenue_type?: string;
   timestamp?: Date;
 };
 
@@ -110,13 +112,15 @@ export default function StatsScreen() {
         .map((entry, index) => {
           const entryRevenue = entry.revenue || 0;
           const createdAt = entry.created_at ? new Date(entry.created_at) : new Date();
+          const revenueType = entry.revenue_type || 'adsense'; // Default to 'adsense' if not specified
           
           return {
             id: index,
             date: createdAt.toLocaleDateString(),
             revenue: entryRevenue,
             status: 'Recorded',
-            source: 'YouTube Revenue',
+            source: revenueType === 'music' ? 'Music Revenue' : 'Adsense Revenue',
+            revenue_type: revenueType,
             timestamp: createdAt
           };
         }).reverse(); // Most recent first
@@ -190,7 +194,7 @@ export default function StatsScreen() {
                       <Text style={styles.historyDate}>{item.date}</Text>
                     </View>
                     <View style={styles.historyDetails}>
-                      <Text style={styles.historySource}>YouTube Revenue</Text>
+                      <Text style={styles.historySource}>{item.source}</Text>
                       <Text style={styles.statusRecorded}>
                         Recorded
                       </Text>

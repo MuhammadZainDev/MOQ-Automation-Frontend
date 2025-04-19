@@ -37,8 +37,11 @@ type UserAnalyticsData = {
   videos: number;
   premium_country_views: number;
   posts: number;
+  adsense_revenue?: number;
+  music_revenue?: number;
   entries?: Array<{
     revenue: number;
+    revenue_type?: string;
     created_at?: string;
     [key: string]: any;
   }>;
@@ -910,7 +913,7 @@ export default function HomeScreen() {
                   <View style={styles.detailedCardsRow}>
                     {/* Revenue Card */}
                     <View style={styles.detailedCard}>
-                      <Text style={styles.cardTitle}>Revenue</Text>
+                      <Text style={styles.cardTitle}>Total Revenue</Text>
                       <Text style={styles.cardValue}>{formatNumber(analyticsData.revenue || 0)}</Text>
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
@@ -925,10 +928,40 @@ export default function HomeScreen() {
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
                         <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.videos || 0) / 28))} / day</Text>
-            </View>
-          </View>
-        </View>
-        
+                      </View>
+                    </View>
+                  </View>
+                  
+                  <View style={styles.detailedCardsRow}>
+                    {/* Adsense Revenue Card */}
+                    <View style={styles.detailedCard}>
+                      <Text style={styles.cardTitle}>Adsense Revenue</Text>
+                      <Text style={styles.cardValue}>{formatNumber(analyticsData.adsense_revenue || 0)}</Text>
+                      <View style={styles.averageContainer}>
+                        <Text style={styles.averageLabel}>% of Total</Text>
+                        <Text style={styles.averageValue}>
+                          {analyticsData.revenue ? 
+                            Math.round(((analyticsData.adsense_revenue || 0) / analyticsData.revenue) * 100) + '%'
+                            : '0%'}
+                        </Text>
+                      </View>
+                    </View>
+                    
+                    {/* Music Revenue Card */}
+                    <View style={styles.detailedCard}>
+                      <Text style={styles.cardTitle}>Music Revenue</Text>
+                      <Text style={styles.cardValue}>{formatNumber(analyticsData.music_revenue || 0)}</Text>
+                      <View style={styles.averageContainer}>
+                        <Text style={styles.averageLabel}>% of Total</Text>
+                        <Text style={styles.averageValue}>
+                          {analyticsData.revenue ? 
+                            Math.round(((analyticsData.music_revenue || 0) / analyticsData.revenue) * 100) + '%'
+                            : '0%'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                  
                   <View style={styles.detailedCardsRow}>
                     {/* Views Card */}
                     <View style={styles.detailedCard}>
@@ -977,7 +1010,7 @@ export default function HomeScreen() {
                 <Text style={styles.dateText}>
                   Monthly Summary for {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}
                 </Text>
-              </View>
+                </View>
               <View style={styles.notificationContent}>
                 <Text style={styles.notificationText}>
                   In {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}, your <Text style={styles.blueText}>total revenue</Text> 
@@ -1095,7 +1128,7 @@ export default function HomeScreen() {
                 </Text>
                 <Text style={styles.redHeaderText}>
                   {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedViewsMonth]} Total Views
-                </Text>
+              </Text>
               </View>
               <TouchableOpacity style={styles.redHeaderMoreBtn} onPress={() => setShowViewsChartOptions(!showViewsChartOptions)}>
                 <Feather name="more-horizontal" size={24} color="#fff" />

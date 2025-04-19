@@ -52,6 +52,9 @@ type UserAnalytics = {
   videos: number;
   premium_country_views: number;
   entries?: any[];
+  revenue_type?: string;
+  adsense_revenue?: number;
+  music_revenue?: number;
 };
 
 // Custom layout component without the header for this page
@@ -100,9 +103,11 @@ export default function UserDetailScreen() {
   const [views, setViews] = useState('');
   const [videos, setVideos] = useState('');
   const [premiumCountryViews, setPremiumCountryViews] = useState('');
+  const [revenueType, setRevenueType] = useState('adsense'); // Default to 'adsense'
   const [savingAnalytics, setSavingAnalytics] = useState(false);
   const [toggleLoading, setToggleLoading] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [showRevenueTypeDropdown, setShowRevenueTypeDropdown] = useState(false);
 
   // Fetch user details and analytics
   useEffect(() => {
@@ -180,7 +185,8 @@ export default function UserDetailScreen() {
         revenue: !isNaN(Number(revenue)) ? Number(revenue) : 0,
         views: !isNaN(Number(views)) ? Number(views) : 0,
         videos: !isNaN(Number(videos)) ? Number(videos) : 0,
-        premium_country_views: !isNaN(Number(premiumCountryViews)) ? Number(premiumCountryViews) : 0
+        premium_country_views: !isNaN(Number(premiumCountryViews)) ? Number(premiumCountryViews) : 0,
+        revenue_type: revenueType // Add the revenue_type field
       };
       
       // Update user analytics
@@ -192,6 +198,7 @@ export default function UserDetailScreen() {
         setViews('');
         setVideos('');
         setPremiumCountryViews('');
+        // Keep the revenue type selection for convenience
         
         // Show success message
         Toast.show({
@@ -387,13 +394,25 @@ export default function UserDetailScreen() {
             
             <View style={styles.boxesRow}>
               <View style={styles.analyticsBox}>
-                <Text style={styles.boxLabel}>Revenue</Text>
+                <Text style={styles.boxLabel}>Revenue (Total)</Text>
                 <Text style={styles.boxValue}>{formatNumber(user?.analytics?.revenue || 0)}</Text>
               </View>
               
               <View style={styles.analyticsBox}>
                 <Text style={styles.boxLabel}>Views</Text>
                 <Text style={styles.boxValue}>{formatNumber(user?.analytics?.views || 0)}</Text>
+              </View>
+            </View>
+            
+            <View style={styles.boxesRow}>
+              <View style={styles.analyticsBox}>
+                <Text style={styles.boxLabel}>Adsense Revenue</Text>
+                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.adsense_revenue || 0)}</Text>
+              </View>
+              
+              <View style={styles.analyticsBox}>
+                <Text style={styles.boxLabel}>Music Revenue</Text>
+                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.music_revenue || 0)}</Text>
               </View>
             </View>
             
@@ -469,6 +488,49 @@ export default function UserDetailScreen() {
               onChangeText={setPremiumCountryViews}
               keyboardType="numeric"
             />
+          </View>
+          
+          {/* Revenue Type - Add it here after Premium Country Views */}
+          <Text style={styles.label}>Revenue Type</Text>
+          <View style={[styles.inputContainer, {zIndex: 100}]}>
+            <Ionicons name="wallet-outline" size={22} color="#777" style={styles.inputIcon} />
+            <TouchableOpacity 
+              style={styles.dropdownSelectorInline}
+              onPress={() => setShowRevenueTypeDropdown(!showRevenueTypeDropdown)}
+            >
+              <Text style={[styles.input, {paddingVertical: 0, height: 'auto', textAlignVertical: 'center'}]}>
+                {revenueType === 'adsense' ? 'Adsense Revenue' : 'Music Revenue'}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color="#999" style={{marginRight: 15}} />
+            </TouchableOpacity>
+            
+            {showRevenueTypeDropdown && (
+              <View style={styles.dropdownOptions}>
+                <TouchableOpacity 
+                  style={[styles.dropdownOption, revenueType === 'adsense' && styles.selectedOption]}
+                  onPress={() => {
+                    setRevenueType('adsense');
+                    setShowRevenueTypeDropdown(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownOptionText, revenueType === 'adsense' && styles.selectedOptionText]}>
+                    Adsense Revenue
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.dropdownOption, revenueType === 'music' && styles.selectedOption]}
+                  onPress={() => {
+                    setRevenueType('music');
+                    setShowRevenueTypeDropdown(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownOptionText, revenueType === 'music' && styles.selectedOptionText]}>
+                    Music Revenue
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
           
           {/* Simple Toggle Button */}
@@ -800,5 +862,61 @@ const styles = StyleSheet.create({
   disabledButton: {
     opacity: 0.5,
     backgroundColor: '#666',
+  },
+  dropdownContainer: {
+    marginBottom: 15,
+    position: 'relative',
+    zIndex: 100,
+  },
+  dropdownSelector: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 15,
+    borderWidth: 1,
+    borderColor: '#333',
+  },
+  dropdownSelectorInline: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    height: '100%',
+  },
+  dropdownText: {
+    color: '#FFF',
+    fontSize: 16,
+  },
+  dropdownOptions: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#333',
+    borderWidth: 1,
+    borderColor: '#444',
+    borderRadius: 8,
+    marginTop: 5,
+    zIndex: 101,
+  },
+  dropdownOption: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  selectedOption: {
+    backgroundColor: '#444',
+  },
+  dropdownOptionText: {
+    color: '#CCC',
+    fontSize: 16,
+  },
+  selectedOptionText: {
+    color: '#FFF',
+    fontWeight: 'bold',
   },
 }); 
