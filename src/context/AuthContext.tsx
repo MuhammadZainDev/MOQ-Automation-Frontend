@@ -546,34 +546,44 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const updateProfilePicture = async (pictureUrl: string) => {
     try {
       const token = await AsyncStorage.getItem('token');
+      
       if (!token) {
         throw new Error('Authentication required');
       }
-
+      
       const response = await authApi.updateProfilePicture(pictureUrl);
-      if (response.status === 'success' && response.user) {
-        // Update the user in state
-        setUser(response.user);
+      
+      if (response.status === 'success') {
+        // Immediately update the user state with the new profile picture
+        setUser(prevUser => {
+          if (!prevUser) return null;
+          
+          const updatedUser = { 
+            ...prevUser, 
+            profile_picture: pictureUrl 
+          };
+          
+          // Also persist the updated user info to AsyncStorage
+          AsyncStorage.setItem('user', JSON.stringify(updatedUser))
+            .catch(error => console.error('Error saving updated user to AsyncStorage:', error));
+            
+          return updatedUser;
+        });
         
-        // Also update the user in AsyncStorage to persist the profile picture
-        await AsyncStorage.setItem('user', JSON.stringify(response.user));
-        console.log('Updated user with profile picture in AsyncStorage:', response.user);
-        
-        // Show success toast
         Toast.show({
           type: 'success',
-          text1: 'Success',
-          text2: 'Profile picture updated successfully',
+          text1: 'Profile picture updated',
           position: 'bottom'
         });
         
-        return { success: true, user: response.user };
+        return { success: true };
       } else {
+        console.error('Failed to update profile picture:', response);
         return { success: false, error: response.message || 'Failed to update profile picture' };
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error updating profile picture:', error);
-      return { success: false, error: error instanceof Error ? error.message : 'Failed to update profile picture' };
+      return { success: false, error: error.message || 'Unknown error occurred' };
     }
   };
 

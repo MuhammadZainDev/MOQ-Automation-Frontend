@@ -217,6 +217,9 @@ export default function HomeScreen() {
   });
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   
+  // Add state for profile image cache busting
+  const [profileImageKey, setProfileImageKey] = useState(Date.now());
+  
   // Move these states before any conditional returns
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
   const [selectedViewsMonth, setSelectedViewsMonth] = useState<number>(new Date().getMonth());
@@ -714,6 +717,55 @@ export default function HomeScreen() {
     }
   };
 
+  // Function to get the last update time display text
+  const getLastUpdateText = useCallback(() => {
+    // If no analytics data or no entries, return 'Never'
+    if (!analyticsData || !analyticsData.entries || analyticsData.entries.length === 0) {
+      return 'Never';
+    }
+    
+    // Find the most recent entry by sorting created_at timestamps
+    const sortedEntries = [...analyticsData.entries].sort((a, b) => {
+      const dateA = new Date(a.created_at || 0);
+      const dateB = new Date(b.created_at || 0);
+      return dateB.getTime() - dateA.getTime(); // Descending order (most recent first)
+    });
+    
+    // Get the most recent entry
+    const latestEntry = sortedEntries[0];
+    if (!latestEntry || !latestEntry.created_at) {
+      return 'Unknown';
+    }
+    
+    // Parse the timestamp
+    const updateDate = new Date(latestEntry.created_at);
+    const now = new Date();
+    
+    // Check if it's today
+    if (
+      updateDate.getDate() === now.getDate() &&
+      updateDate.getMonth() === now.getMonth() &&
+      updateDate.getFullYear() === now.getFullYear()
+    ) {
+      // Format the time if it's today
+      return `Today at ${updateDate.getHours().toString().padStart(2, '0')}:${updateDate.getMinutes().toString().padStart(2, '0')}`;
+    }
+    
+    // Check if it's yesterday
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (
+      updateDate.getDate() === yesterday.getDate() &&
+      updateDate.getMonth() === yesterday.getMonth() &&
+      updateDate.getFullYear() === yesterday.getFullYear()
+    ) {
+      return 'Yesterday';
+    }
+    
+    // Otherwise, return the date
+    return `${updateDate.getDate()}/${updateDate.getMonth() + 1}/${updateDate.getFullYear()}`;
+  }, [analyticsData]);
+
   // Remove early returns and use conditional rendering instead
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -734,7 +786,10 @@ export default function HomeScreen() {
             <View style={styles.channelInfo}>
               <View style={styles.logoContainer}>
                 <Image 
-                  source={user?.profile_picture ? { uri: user.profile_picture } : require('../../assets/logo/logo.jpg')} 
+                  key={`profile-image-${profileImageKey}`}
+                  source={user?.profile_picture 
+                    ? { uri: `${user.profile_picture}?cache=${profileImageKey}` } 
+                    : require('../../assets/logo/logo.jpg')} 
                   style={styles.logo}
                   resizeMode="cover"
                 />
@@ -745,7 +800,7 @@ export default function HomeScreen() {
                 <Text style={styles.lastUpdate}>
                   Last updated: {isLoadingAnalytics ? (
                     <ActivityIndicator size="small" color="#DF0000" />
-                  ) : 'Today'}
+                  ) : getLastUpdateText()}
                 </Text>
               </View>
             </View>

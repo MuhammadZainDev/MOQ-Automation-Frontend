@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
@@ -13,6 +13,14 @@ export default function ProfileScreen() {
   const [newName, setNewName] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [imageKey, setImageKey] = useState(Date.now());
+  const [localProfileImage, setLocalProfileImage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.profile_picture) {
+      setLocalProfileImage(user.profile_picture);
+    }
+  }, [user?.profile_picture]);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -83,11 +91,17 @@ export default function ProfileScreen() {
         
         console.log("Selected image URI:", imageUrl);
         
+        // Immediately update the local image to show the selected image
+        setLocalProfileImage(imageUrl);
+        
         try {
           // Update profile picture in backend
           const response = await updateProfilePicture(imageUrl);
           
           if (response.success) {
+            // Force a re-render of the image by updating the key
+            setImageKey(Date.now());
+            
             Toast.show({
               type: 'success',
               text1: 'Success',
@@ -95,6 +109,9 @@ export default function ProfileScreen() {
               position: 'bottom'
             });
           } else {
+            // If update failed, revert to old image
+            setLocalProfileImage(user?.profile_picture || null);
+            
             Toast.show({
               type: 'error',
               text1: 'Error',
@@ -103,6 +120,9 @@ export default function ProfileScreen() {
             });
           }
         } catch (uploadError: any) {
+          // If update failed, revert to old image
+          setLocalProfileImage(user?.profile_picture || null);
+          
           console.error('Error updating profile picture:', uploadError);
           Toast.show({
             type: 'error',
@@ -146,7 +166,10 @@ export default function ProfileScreen() {
           ) : (
             <>
               <Image 
-                source={user?.profile_picture ? { uri: user.profile_picture } : require('../../assets/logo/logo.jpg')} 
+                key={`profile-image-${imageKey}`}
+                source={localProfileImage 
+                  ? { uri: `${localProfileImage}?cache=${imageKey}` }
+                  : require('../../assets/logo/logo.jpg')}
                 style={styles.logoImage}
                 resizeMode="cover"
               />
