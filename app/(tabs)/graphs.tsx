@@ -260,7 +260,7 @@ export default function GraphsScreen() {
           }
         }
       });
-    } else {
+        } else {
       // If no entries with timestamps, just set the current month to have the total revenue
       // and leave other months at zero or minimal values
       const currentMonth = new Date().getMonth();
@@ -525,8 +525,8 @@ export default function GraphsScreen() {
     return months.map((month, index) => {
       // Determine if this month has significant data or just a placeholder value
       const hasSignificantData = monthlyStats[index] > threshold && hasRealData[index];
-      
-      return {
+    
+    return {
         value: monthlyStats[index], // Use this for the display height
         label: month,
         frontColor: 
@@ -820,12 +820,12 @@ export default function GraphsScreen() {
           <Text style={styles.loadingText}>Loading analytics data...</Text>
         </View>
       ) : (
-        <ScrollView style={styles.container}>
-          <View style={styles.header}>
-            <Text style={styles.headerTitle}>Analytics Graphs</Text>
+    <ScrollView style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Analytics Graphs</Text>
             <Text style={styles.headerSubtitle}>Visualize your performance data</Text>
-          </View>
-          
+      </View>
+
           {/* Monthly Revenue Chart */}
           <View style={[styles.chartContainer, {backgroundColor: '#212121'}]}>
             <View style={styles.redHeader}>
@@ -847,8 +847,8 @@ export default function GraphsScreen() {
               }}>
                 <Feather name="more-horizontal" size={24} color="#fff" />
               </TouchableOpacity>
-            </View>
-            
+          </View>
+          
             {/* Revenue Chart Options Popup */}
             {showRevenueChartOptions && (
               <>
@@ -878,7 +878,7 @@ export default function GraphsScreen() {
                     <Feather name="refresh-cw" size={18} color="#fff" />
                     <Text style={styles.chartOptionText}>Refresh</Text>
                   </TouchableOpacity>
-                </View>
+          </View>
               </>
             )}
             
@@ -966,8 +966,8 @@ export default function GraphsScreen() {
                 xAxisLabelTextStyle={{color: '#ccc', textAlign: 'center'}}
                 hideOrigin
               />
-            </View>
           </View>
+        </View>
           
           {/* Monthly Views Chart */}
           <View style={[styles.chartContainer, {backgroundColor: '#212121', marginTop: 20}]}>
@@ -990,8 +990,8 @@ export default function GraphsScreen() {
               }}>
                 <Feather name="more-horizontal" size={24} color="#fff" />
               </TouchableOpacity>
-            </View>
-            
+      </View>
+
             {/* Views Chart Options Popup */}
             {showViewsChartOptions && (
               <>
@@ -1022,9 +1022,9 @@ export default function GraphsScreen() {
                     <Text style={styles.chartOptionText}>Refresh</Text>
                   </TouchableOpacity>
                 </View>
-              </>
-            )}
-            
+          </>
+        )}
+
             {/* Views Monthly Summary Box */}
             <Text style={styles.monthSummaryHeading}>
               Monthly Summary for {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedViewsMonth]}
@@ -1092,10 +1092,10 @@ export default function GraphsScreen() {
             </View>
             
             <View style={styles.chartWrapper}>
-              <BarChart
+            <BarChart
                 data={getMonthlyViewsBarData()}
                 width={screenWidth - 80}
-                height={220}
+              height={220}
                 barWidth={30}
                 spacing={18}
                 barBorderRadius={4}
@@ -1165,8 +1165,8 @@ export default function GraphsScreen() {
                     <Text style={styles.chartOptionText}>Refresh</Text>
                   </TouchableOpacity>
                 </View>
-              </>
-            )}
+          </>
+        )}
             
             {/* Videos Monthly Summary Box */}
             <Text style={styles.monthSummaryHeading}>
@@ -1232,8 +1232,8 @@ export default function GraphsScreen() {
                   })()}
                 </Text>
               </View>
-            </View>
-            
+        </View>
+        
             <View style={styles.chartWrapper}>
               <BarChart
                 data={getMonthlyVideosBarData()}
@@ -1276,8 +1276,8 @@ export default function GraphsScreen() {
               }}>
                 <Feather name="more-horizontal" size={24} color="#fff" />
               </TouchableOpacity>
-            </View>
-            
+          </View>
+          
             {/* Premium Views Chart Options Popup */}
             {showPremiumViewsChartOptions && (
               <>
@@ -1307,7 +1307,7 @@ export default function GraphsScreen() {
                     <Feather name="refresh-cw" size={18} color="#fff" />
                     <Text style={styles.chartOptionText}>Refresh</Text>
                   </TouchableOpacity>
-                </View>
+          </View>
               </>
             )}
             
@@ -1374,8 +1374,8 @@ export default function GraphsScreen() {
                     }
                   })()}
                 </Text>
-              </View>
-            </View>
+          </View>
+        </View>
             
             <View style={styles.chartWrapper}>
               <BarChart
@@ -1396,8 +1396,8 @@ export default function GraphsScreen() {
                 hideOrigin
               />
             </View>
-          </View>
-        </ScrollView>
+      </View>
+    </ScrollView>
       )}
     </SafeAreaView>
   );

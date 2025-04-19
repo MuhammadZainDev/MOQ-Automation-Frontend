@@ -734,9 +734,9 @@ export default function HomeScreen() {
             <View style={styles.channelInfo}>
               <View style={styles.logoContainer}>
                 <Image 
-                  source={require('../../assets/logo/logo.jpg')} 
+                  source={user?.profile_picture ? { uri: user.profile_picture } : require('../../assets/logo/logo.jpg')} 
                   style={styles.logo}
-                  resizeMode="contain"
+                  resizeMode="cover"
                 />
               </View>
               
@@ -928,10 +928,10 @@ export default function HomeScreen() {
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
                         <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.videos || 0) / 28))} / day</Text>
-                      </View>
-                    </View>
-                  </View>
-                  
+            </View>
+          </View>
+        </View>
+        
                   <View style={styles.detailedCardsRow}>
                     {/* Adsense Revenue Card */}
                     <View style={styles.detailedCard}>

@@ -13,6 +13,7 @@ type User = {
   email: string;
   role: string;
   isActive: boolean;
+  profile_picture?: string;
 };
 
 // Auth context type definition
@@ -31,6 +32,7 @@ type AuthContextType = {
   clearError: () => void;
   verifyCode: (email: string, code: string) => Promise<any>;
   updateName: (newName: string) => Promise<any>;
+  updateProfilePicture: (pictureUrl: string) => Promise<{success: boolean, error?: string, user?: User}>;
 };
 
 // Create the auth context with default values
@@ -49,6 +51,7 @@ const AuthContext = createContext<AuthContextType>({
   clearError: () => {},
   verifyCode: async () => ({ success: false }),
   updateName: async () => ({ success: false }),
+  updateProfilePicture: async () => ({ success: false }),
 });
 
 // Auth provider props
@@ -540,6 +543,40 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
+  const updateProfilePicture = async (pictureUrl: string) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication required');
+      }
+
+      const response = await authApi.updateProfilePicture(pictureUrl);
+      if (response.status === 'success' && response.user) {
+        // Update the user in state
+        setUser(response.user);
+        
+        // Also update the user in AsyncStorage to persist the profile picture
+        await AsyncStorage.setItem('user', JSON.stringify(response.user));
+        console.log('Updated user with profile picture in AsyncStorage:', response.user);
+        
+        // Show success toast
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Profile picture updated successfully',
+          position: 'bottom'
+        });
+        
+        return { success: true, user: response.user };
+      } else {
+        return { success: false, error: response.message || 'Failed to update profile picture' };
+      }
+    } catch (error) {
+      console.error('Error updating profile picture:', error);
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to update profile picture' };
+    }
+  };
+
   const contextValue = {
         user,
         isLoading,
@@ -555,6 +592,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     clearError,
     verifyCode,
     updateName,
+    updateProfilePicture,
   };
 
   return (

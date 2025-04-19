@@ -1,15 +1,18 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/context/AuthContext';
 import { router } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import Toast from 'react-native-toast-message';
 
 export default function ProfileScreen() {
-  const { user, logout, updateName } = useAuth();
+  const { user, logout, updateName, updateProfilePicture } = useAuth();
   const [loggingOut, setLoggingOut] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [newName, setNewName] = useState('');
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   const handleLogout = async () => {
     setLoggingOut(true);
@@ -24,12 +27,14 @@ export default function ProfileScreen() {
   };
 
   const handleEditName = () => {
-    setNewName(user.name);
-    setShowEditModal(true);
+    if (user) {
+      setNewName(user.name);
+      setShowEditModal(true);
+    }
   };
 
   const handleSaveName = async () => {
-    if (!newName.trim() || newName === user.name) {
+    if (!user || !newName.trim() || newName === user.name) {
       setShowEditModal(false);
       return;
     }
@@ -50,6 +55,76 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleProfilePictureChange = async () => {
+    try {
+      // Ask for permission
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Please allow access to your photo library to change profile picture.');
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const selectedImage = result.assets[0];
+        
+        // Start loading state
+        setIsUploadingImage(true);
+        
+        // Use the URI directly
+        const imageUrl = selectedImage.uri;
+        
+        console.log("Selected image URI:", imageUrl);
+        
+        try {
+          // Update profile picture in backend
+          const response = await updateProfilePicture(imageUrl);
+          
+          if (response.success) {
+            Toast.show({
+              type: 'success',
+              text1: 'Success',
+              text2: 'Profile picture updated',
+              position: 'bottom'
+            });
+          } else {
+            Toast.show({
+              type: 'error',
+              text1: 'Error',
+              text2: response.error || 'Failed to update profile picture',
+              position: 'bottom'
+            });
+          }
+        } catch (uploadError: any) {
+          console.error('Error updating profile picture:', uploadError);
+          Toast.show({
+            type: 'error',
+            text1: 'Error',
+            text2: `Error updating profile picture: ${uploadError.message || 'Unknown error'}`,
+            position: 'bottom'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error selecting/uploading image:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to update profile picture',
+        position: 'bottom'
+      });
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   if (!user) {
     return (
       <View style={styles.container}>
@@ -61,13 +136,26 @@ export default function ProfileScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.profileHeader}>
-        <View style={styles.avatarContainer}>
-          <Image 
-            source={require('../../assets/logo/logo.jpg')} 
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-        </View>
+        <TouchableOpacity 
+          style={styles.avatarContainer} 
+          onPress={handleProfilePictureChange}
+          disabled={isUploadingImage}
+        >
+          {isUploadingImage ? (
+            <ActivityIndicator color="#DF0000" size="large" />
+          ) : (
+            <>
+              <Image 
+                source={user?.profile_picture ? { uri: user.profile_picture } : require('../../assets/logo/logo.jpg')} 
+                style={styles.logoImage}
+                resizeMode="cover"
+              />
+              <View style={styles.editImageOverlay}>
+                <Ionicons name="camera" size={24} color="#fff" />
+              </View>
+            </>
+          )}
+        </TouchableOpacity>
         <View style={styles.nameContainer}>
           <Text style={styles.name}>{user.name}</Text>
           <TouchableOpacity style={styles.editButton} onPress={handleEditName}>
@@ -100,21 +188,24 @@ export default function ProfileScreen() {
         visible={showEditModal}
         transparent={true}
         animationType="fade"
+        onRequestClose={() => setShowEditModal(false)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Edit Profile Name</Text>
+            <Text style={styles.modalTitle}>Edit Name</Text>
             <TextInput
-              style={styles.input}
-              value={newName}
-              onChangeText={setNewName}
+              style={styles.modalInput}
               placeholder="Enter new name"
               placeholderTextColor="#999"
+              value={newName}
+              onChangeText={setNewName}
+              autoCapitalize="words"
             />
-            <View style={styles.modalButtonsContainer}>
+            <View style={styles.modalButtons}>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.cancelButton]} 
                 onPress={() => setShowEditModal(false)}
+                disabled={isUpdating}
               >
                 <Text style={styles.modalButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -124,7 +215,7 @@ export default function ProfileScreen() {
                 disabled={isUpdating}
               >
                 {isUpdating ? (
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator color="#fff" size="small" />
                 ) : (
                   <Text style={styles.modalButtonText}>Save</Text>
                 )}
@@ -162,6 +253,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 15,
     overflow: 'hidden',
+    position: 'relative',
   },
   logoImage: {
     width: '100%',
@@ -241,23 +333,23 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     textAlign: 'center',
   },
-  input: {
+  modalInput: {
     backgroundColor: '#333',
-    borderRadius: 5,
     padding: 12,
+    borderRadius: 6,
     color: '#fff',
     marginBottom: 20,
   },
-  modalButtonsContainer: {
+  modalButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
   },
   modalButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 5,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 6,
+    width: '48%',
     alignItems: 'center',
-    marginHorizontal: 5,
   },
   cancelButton: {
     backgroundColor: '#444',
@@ -268,5 +360,15 @@ const styles = StyleSheet.create({
   modalButtonText: {
     color: '#fff',
     fontWeight: 'bold',
+  },
+  editImageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 }); 

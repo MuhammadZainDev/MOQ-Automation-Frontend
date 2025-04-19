@@ -93,4 +93,50 @@ export const updateUserName = async (newName) => {
     console.error('Update name error:', error.response?.data || error);
     throw new Error(error.response?.data?.message || 'Failed to update name');
   }
+};
+
+/**
+ * Update user profile picture
+ * @param {string} imageUri - Local URI of the image
+ * @returns {Promise<Object>}
+ */
+export const updateProfilePicture = async (imageUri) => {
+  try {
+    console.log("Starting profile picture upload with URI:", imageUri);
+    
+    // Create a new FormData instance
+    const formData = new FormData();
+    
+    // Get the filename from the URI path
+    const uriParts = imageUri.split('/');
+    const fileName = uriParts[uriParts.length - 1];
+    
+    // Create the file object
+    const file = {
+      uri: imageUri,
+      type: 'image/jpeg', // Default to jpeg, adjust if needed
+      name: fileName,
+    };
+    
+    console.log("Creating file object:", { name: fileName, uri: imageUri.substring(0, 50) + '...' });
+    
+    // Append the file to FormData
+    formData.append('profileImage', file);
+    
+    // Send the request with FormData
+    console.log("Sending profile picture update request...");
+    const response = await axios.patch('/auth/update-profile-picture', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    
+    console.log("Profile picture update response:", response.data);
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error updating profile picture:', error);
+    console.error('Error response:', error.response?.data);
+    throw error;
+  }
 }; 
