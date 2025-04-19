@@ -8,8 +8,8 @@ export const adminService = {
       const response = await API.get('/admin/stats');
       return response.data;
     } catch (error) {
-      console.error('Error fetching user stats:', error);
-      throw error;
+      console.error('Error fetching user revenue:', error);
+      return { success: false, message: 'Failed to fetch revenue data' };
     }
   },
 
@@ -177,7 +177,7 @@ export const adminService = {
       return {
         success: true,
         data: {
-          stats: '',
+          revenue: '',
           views: '',
           videos: '',
           premium_country_views: ''
@@ -240,7 +240,7 @@ export const adminService = {
           const isoDate = currentDate.toISOString();
           
           enhancedData.data.entries = [{
-            stats: enhancedData.data.stats || 0,
+            revenue: enhancedData.data.revenue || 0,
             views: enhancedData.data.views || 0,
             videos: enhancedData.data.videos || 0,
             premium_country_views: enhancedData.data.premium_country_views || 0,
@@ -259,7 +259,7 @@ export const adminService = {
       return {
         success: true,
         data: {
-          stats: 100,
+          revenue: 100,
           views: 50,
           videos: 5,
           premium_country_views: 10,
@@ -267,7 +267,7 @@ export const adminService = {
           likes: 100,
           // Add a fake entry for the current month
           entries: [{
-            stats: 100, 
+            revenue: 100, 
             views: 50,
             videos: 5,
             premium_country_views: 10,

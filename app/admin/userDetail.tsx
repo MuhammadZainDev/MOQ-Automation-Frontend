@@ -47,7 +47,7 @@ type UserDetail = {
 };
 
 type UserAnalytics = {
-  stats: number;
+  revenue: number;
   views: number;
   videos: number;
   premium_country_views: number;
@@ -96,7 +96,7 @@ export default function UserDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [stats, setStats] = useState('');
+  const [revenue, setRevenue] = useState('');
   const [views, setViews] = useState('');
   const [videos, setVideos] = useState('');
   const [premiumCountryViews, setPremiumCountryViews] = useState('');
@@ -140,7 +140,7 @@ export default function UserDetailScreen() {
             } : null);
             
             // Set individual analytics fields (for display purposes)
-            setStats('');
+            setRevenue('');
             setViews('');
             setVideos('');
             setPremiumCountryViews('');
@@ -175,9 +175,9 @@ export default function UserDetailScreen() {
     try {
       setSavingAnalytics(true);
       
-      // Convert numeric fields to numbers, default to 0 if invalid
+      // Validate inputs - ensure they are numbers
       const analyticsData = {
-        stats: !isNaN(Number(stats)) ? Number(stats) : 0,
+        revenue: !isNaN(Number(revenue)) ? Number(revenue) : 0,
         views: !isNaN(Number(views)) ? Number(views) : 0,
         videos: !isNaN(Number(videos)) ? Number(videos) : 0,
         premium_country_views: !isNaN(Number(premiumCountryViews)) ? Number(premiumCountryViews) : 0
@@ -188,7 +188,7 @@ export default function UserDetailScreen() {
       
       if (response.success) {
         // Clear the input fields
-        setStats('');
+        setRevenue('');
         setViews('');
         setVideos('');
         setPremiumCountryViews('');
@@ -383,12 +383,12 @@ export default function UserDetailScreen() {
           
           {/* Current Analytics Totals */}
           <View style={styles.currentTotalsContainer}>
-            <Text style={styles.currentTotalsTitle}>Current Analytics Totals</Text>
+            <Text style={styles.currentTotalsTitle}>Current Revenue Totals</Text>
             
             <View style={styles.boxesRow}>
               <View style={styles.analyticsBox}>
-                <Text style={styles.boxLabel}>Stats</Text>
-                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.stats || 0)}</Text>
+                <Text style={styles.boxLabel}>Revenue</Text>
+                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.revenue || 0)}</Text>
               </View>
               
               <View style={styles.analyticsBox}>
@@ -410,18 +410,18 @@ export default function UserDetailScreen() {
             </View>
           </View>
           
-          {/* Stats and Views in a row */}
+          {/* Revenue and Views in a row */}
           <View style={styles.rowContainer}>
             <View style={styles.halfColumn}>
-              <Text style={styles.label}>Stats</Text>
+              <Text style={styles.label}>Revenue</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="stats-chart-outline" size={22} color="#777" style={styles.inputIcon} />
                 <TextInput 
                   style={styles.input} 
-                  placeholder="Enter new stats to add" 
+                  placeholder="Enter new revenue to add" 
                   placeholderTextColor="#777"
-                  value={stats}
-                  onChangeText={setStats}
+                  value={revenue}
+                  onChangeText={setRevenue}
                   keyboardType="numeric"
                 />
               </View>
@@ -498,10 +498,10 @@ export default function UserDetailScreen() {
             style={[
               styles.saveButton, 
               savingAnalytics && styles.savingButton,
-              (stats === '' && views === '' && videos === '' && premiumCountryViews === '') && styles.disabledButton
+              (revenue === '' && views === '' && videos === '' && premiumCountryViews === '') && styles.disabledButton
             ]} 
             onPress={handleSave}
-            disabled={savingAnalytics || (stats === '' && views === '' && videos === '' && premiumCountryViews === '')}
+            disabled={savingAnalytics || (revenue === '' && views === '' && videos === '' && premiumCountryViews === '')}
           >
             {savingAnalytics ? (
               <ActivityIndicator size="small" color="#fff" />

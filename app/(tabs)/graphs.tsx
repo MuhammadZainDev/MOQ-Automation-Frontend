@@ -268,8 +268,8 @@ export default function GraphsScreen() {
           
           <View style={styles.statItem}>
             <Ionicons name="stats-chart-outline" size={24} color="#DF0000" />
-            <Text style={styles.statValue}>{analytics?.stats || 0}</Text>
-            <Text style={styles.statLabel}>Stats</Text>
+            <Text style={styles.statValue}>{analytics?.revenue || 0}</Text>
+            <Text style={styles.statLabel}>Revenue</Text>
           </View>
         </View>
       </View>

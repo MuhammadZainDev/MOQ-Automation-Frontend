@@ -12,7 +12,8 @@ import {
   StatusBar,
   TextInput,
   Dimensions,
-  RefreshControl
+  RefreshControl,
+  Platform
 } from 'react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import { Ionicons, AntDesign, Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -21,19 +22,23 @@ import { adminService } from '../../src/services/adminApi';
 import { LineChart, BarChart } from 'react-native-gifted-charts';
 import { LinearGradient } from 'expo-linear-gradient';
 import Toast from 'react-native-toast-message';
+// @ts-ignore
+import RNHTMLtoPDF from 'react-native-html-to-pdf';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 
 // Get screen width for responsive chart
 const screenWidth = Dimensions.get('window').width;
 
 // Define analytics type
 type UserAnalyticsData = {
-  stats: number;
+  revenue: number;
   views: number;
   videos: number;
   premium_country_views: number;
   posts: number;
   entries?: Array<{
-    stats: number;
+    revenue: number;
     created_at?: string;
     [key: string]: any;
   }>;
@@ -41,7 +46,7 @@ type UserAnalyticsData = {
 
 // Daily/Recent analytics data type
 type DailyAnalyticsData = {
-  stats: number;
+  revenue: number;
   views: number;
   videos: number;
   premium_country_views: number;
@@ -65,12 +70,136 @@ const formatNumber = (num: number): string => {
   return num.toString();
 };
 
+// Update the generatePDF function
+const generatePDF = async (data: any, type = 'revenue') => {
+  try {
+    // Define months array
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const currentYear = new Date().getFullYear();
+    
+    // Create some sample data if no entries exist
+    let monthlyData: number[] = [];
+    let title = type === 'revenue' ? 'Revenue' : 'Views';
+    
+    if (type === 'revenue' && data.monthlyStats) {
+      monthlyData = data.monthlyStats;
+    } else if (type === 'views' && data.monthlyViews) {
+      monthlyData = data.monthlyViews;
+    }
+    
+    // Generate HTML content for the PDF
+    let htmlContent = `
+      <html>
+        <head>
+          <style>
+            body { font-family: Helvetica, Arial, sans-serif; margin: 0; padding: 20px; color: #333; }
+            h1 { color: ${type === 'revenue' ? '#DF0000' : '#2196F3'}; text-align: center; margin-bottom: 30px; }
+            .header { text-align: center; margin-bottom: 30px; }
+            .logo { width: 100px; height: 100px; margin: 0 auto; display: block; border-radius: 50%; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th { background-color: ${type === 'revenue' ? '#DF0000' : '#2196F3'}; color: white; padding: 10px; text-align: left; }
+            td { padding: 10px; border-bottom: 1px solid #ddd; }
+            .total { font-weight: bold; }
+            .date { text-align: right; color: #666; margin-top: 40px; }
+            .chart-img { max-width: 100%; height: auto; margin: 20px 0; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>${title} Report - ${currentYear}</h1>
+            <p>Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}</p>
+          </div>
+          
+          <table>
+            <tr>
+              <th>Month</th>
+              <th>${title}</th>
+            </tr>
+    `;
+    
+    // Add rows for each month
+    let totalValue = 0;
+    months.forEach((month, index) => {
+      const value = monthlyData[index] || 0;
+      totalValue += value;
+      
+      // Add cell color based on value (higher values get darker background)
+      const maxValue = Math.max(...monthlyData);
+      const opacity = maxValue > 0 ? (value / maxValue) * 0.3 : 0;
+      const bgColor = type === 'revenue' 
+        ? `rgba(223, 0, 0, ${opacity})` 
+        : `rgba(33, 150, 243, ${opacity})`;
+      
+      htmlContent += `
+        <tr>
+          <td>${month}</td>
+          <td style="background-color: ${bgColor}">
+            ${type === 'revenue' ? '$' : ''}${value.toLocaleString()}
+          </td>
+        </tr>
+      `;
+    });
+    
+    // Add total row
+    htmlContent += `
+        <tr class="total">
+          <td>Total</td>
+          <td>${type === 'revenue' ? '$' : ''}${totalValue.toLocaleString()}</td>
+        </tr>
+      </table>
+      
+      <div class="date">
+        <p>This is an auto-generated report. For questions, please contact support.</p>
+      </div>
+    </body>
+    </html>
+    `;
+    
+    // Mobile implementation using react-native-html-to-pdf
+    const options = {
+      html: htmlContent,
+      fileName: `${title}_Report_${currentYear}`,
+      directory: 'Documents',
+    };
+    
+    // Check if running on Expo
+    if (Platform.OS === 'web') {
+      // Web approach - create a data URL and open in new tab
+      const blob = new Blob([htmlContent], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+      return { success: true };
+    } else {
+      try {
+        // For Expo, use FileSystem to write the HTML file
+        const htmlFile = FileSystem.documentDirectory + `${title}_Report_${currentYear}.html`;
+        await FileSystem.writeAsStringAsync(htmlFile, htmlContent);
+        
+        // Share the file
+        if (await Sharing.isAvailableAsync()) {
+          await Sharing.shareAsync(htmlFile);
+          return { success: true };
+        } else {
+          console.error('Sharing not available');
+          return { success: false, error: 'Sharing not available on this device' };
+        }
+      } catch (error) {
+        console.error('Error generating file:', error);
+        return { success: false, error: String(error) };
+      }
+    }
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    return { success: false, error: String(error) };
+  }
+};
+
 export default function HomeScreen() {
   const { user, isLoading, logout } = useAuth();
   const [selectedTimeframe, setSelectedTimeframe] = useState('280');
   const [showOptions, setShowOptions] = useState(false);
   const [analyticsData, setAnalyticsData] = useState<UserAnalyticsData>({
-    stats: 0,
+    revenue: 0,
     views: 0,
     videos: 0,
     premium_country_views: 0,
@@ -78,24 +207,30 @@ export default function HomeScreen() {
   });
   // Store daily analytics separately
   const [dailyAnalyticsData, setDailyAnalyticsData] = useState<DailyAnalyticsData>({
-    stats: 0,
+    revenue: 0,
     views: 0,
     videos: 0,
     premium_country_views: 0
   });
   const [isLoadingAnalytics, setIsLoadingAnalytics] = useState(false);
   
-  // Mock data for monthly average bar chart
+  // Move these states before any conditional returns
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth());
+  const [selectedViewsMonth, setSelectedViewsMonth] = useState<number>(new Date().getMonth());
 
   // Add state for options menu
-  const [showChartOptions, setShowChartOptions] = useState(false);
+  const [showRevenueChartOptions, setShowRevenueChartOptions] = useState(false);
+  const [showViewsChartOptions, setShowViewsChartOptions] = useState(false);
   
   // Move these states before any conditional returns
   const [selectedMonthValue, setSelectedMonthValue] = useState(0);
   const [selectedMonthHasData, setSelectedMonthHasData] = useState(false);
 
-  // Calculate monthly stats from analytics entries
+  // Add state variable for tracking selected month views value
+  const [selectedMonthViewsValue, setSelectedMonthViewsValue] = useState(0);
+  const [selectedMonthViewsHasData, setSelectedMonthViewsHasData] = useState(false);
+  
+  // Calculate monthly revenue from analytics entries
   const getMonthlyStats = useCallback(() => {
     // Don't filter by current year - just use the latest data for each month
     const monthlyStats = Array(12).fill(0); // Initialize with zeros for all 12 months
@@ -103,7 +238,7 @@ export default function HomeScreen() {
     
     // Check if we have entries with timestamps in the analytics data
     if (analyticsData && analyticsData.entries && Array.isArray(analyticsData.entries)) {
-      console.log(`Processing ${analyticsData.entries.length} entries for monthly stats`);
+      console.log(`Processing ${analyticsData.entries.length} entries for monthly revenue`);
       
       // Process each entry and add to the corresponding month
       analyticsData.entries.forEach(entry => {
@@ -120,10 +255,10 @@ export default function HomeScreen() {
               const month = parseInt(monthMatch[1], 10) - 1;
               
               if (month >= 0 && month < 12) {
-                const statValue = Number(entry.stats || 0);
-                monthlyStats[month] += statValue;
+                const revenueValue = Number(entry.revenue || 0);
+                monthlyStats[month] += revenueValue;
                 hasRealData[month] = true;
-                console.log(`Added ${statValue} to month ${month+1} (${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month]}), new total: ${monthlyStats[month]}`);
+                console.log(`Added ${revenueValue} to month ${month+1} (${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month]}), new total: ${monthlyStats[month]}`);
               } else {
                 console.error("Invalid month extracted:", month, "from", dateStr);
               }
@@ -135,10 +270,10 @@ export default function HomeScreen() {
                 const entryDate = new Date(dateStr);
                 if (!isNaN(entryDate.getTime())) {
                   const month = entryDate.getMonth();
-                  const statValue = Number(entry.stats || 0);
-                  monthlyStats[month] += statValue;
+                  const revenueValue = Number(entry.revenue || 0);
+                  monthlyStats[month] += revenueValue;
                   hasRealData[month] = true;
-                  console.log(`Fallback: Added ${statValue} to month ${month+1}, new total: ${monthlyStats[month]}`);
+                  console.log(`Fallback: Added ${revenueValue} to month ${month+1}, new total: ${monthlyStats[month]}`);
                 }
               } catch (parseError) {
                 console.error("Error in fallback date parsing:", parseError);
@@ -150,20 +285,20 @@ export default function HomeScreen() {
         }
       });
       
-      console.log("Monthly stats after processing:", JSON.stringify(monthlyStats));
+      console.log("Monthly revenue after processing:", JSON.stringify(monthlyStats));
       console.log("Months with real data:", JSON.stringify(hasRealData));
     } else {
-      // If no entries with timestamps, just set the current month to have the total stats
+      // If no entries with timestamps, just set the current month to have the total revenue
       // and leave other months at zero or minimal values
       const currentMonth = new Date().getMonth();
       
-      // Set current month to have the actual stats value
-      monthlyStats[currentMonth] = analyticsData.stats || 0;
+      // Set current month to have the actual revenue value
+      monthlyStats[currentMonth] = analyticsData.revenue || 0;
       hasRealData[currentMonth] = true;
-      console.log(`No entries with timestamps, setting current month ${currentMonth+1} to total stats: ${monthlyStats[currentMonth]}`);
+      console.log(`No entries with timestamps, setting current month ${currentMonth+1} to total revenue: ${monthlyStats[currentMonth]}`);
       
       // Set other months to have minimal value just for visualization (1-5% of the main value)
-      const minBarValue = Math.max(1, Math.floor((analyticsData.stats || 100) * 0.02));
+      const minBarValue = Math.max(1, Math.floor((analyticsData.revenue || 100) * 0.02));
       for (let i = 0; i < 12; i++) {
         if (i !== currentMonth) {
           // Set display height value, but they don't have real data
@@ -176,6 +311,87 @@ export default function HomeScreen() {
     return { monthlyStats, hasRealData };
   }, [analyticsData]);
   
+  // Calculate monthly views from analytics entries
+  const getMonthlyViewsData = useCallback(() => {
+    // Don't filter by current year - just use the latest data for each month
+    const monthlyViews = Array(12).fill(0); // Initialize with zeros for all 12 months
+    const hasRealData = Array(12).fill(false); // Track which months have actual data
+    
+    // Check if we have entries with timestamps in the analytics data
+    if (analyticsData && analyticsData.entries && Array.isArray(analyticsData.entries)) {
+      console.log(`Processing ${analyticsData.entries.length} entries for monthly views`);
+      
+      // Process each entry and add to the corresponding month
+      analyticsData.entries.forEach(entry => {
+        if (entry.created_at) {
+          // Get the month directly from the date string - most reliable method
+          // Format is "2025-03-12 20:26:19.65829+05"
+          try {
+            const dateStr = entry.created_at.toString();
+            
+            // Extract month directly from the string using regex
+            const monthMatch = dateStr.match(/^\d{4}-(\d{2})-/);
+            if (monthMatch && monthMatch[1]) {
+              // Convert to zero-based month (JS months are 0-11)
+              const month = parseInt(monthMatch[1], 10) - 1;
+              
+              if (month >= 0 && month < 12) {
+                const viewsValue = Number(entry.views || 0);
+                monthlyViews[month] += viewsValue;
+                hasRealData[month] = true;
+                console.log(`Added ${viewsValue} views to month ${month+1} (${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month]}), new total: ${monthlyViews[month]}`);
+              } else {
+                console.error("Invalid month extracted:", month, "from", dateStr);
+              }
+            } else {
+              console.error("Failed to extract month from date string:", dateStr);
+              
+              // Fallback to try parsing the whole date
+              try {
+                const entryDate = new Date(dateStr);
+                if (!isNaN(entryDate.getTime())) {
+                  const month = entryDate.getMonth();
+                  const viewsValue = Number(entry.views || 0);
+                  monthlyViews[month] += viewsValue;
+                  hasRealData[month] = true;
+                  console.log(`Fallback: Added ${viewsValue} views to month ${month+1}, new total: ${monthlyViews[month]}`);
+                }
+              } catch (parseError) {
+                console.error("Error in fallback date parsing:", parseError);
+              }
+            }
+          } catch (error) {
+            console.error("Error processing entry date:", error);
+          }
+        }
+      });
+      
+      console.log("Monthly views after processing:", JSON.stringify(monthlyViews));
+      console.log("Months with real data:", JSON.stringify(hasRealData));
+    } else {
+      // If no entries with timestamps, just set the current month to have the total views
+      // and leave other months at zero or minimal values
+      const currentMonth = new Date().getMonth();
+      
+      // Set current month to have the actual views value
+      monthlyViews[currentMonth] = analyticsData.views || 0;
+      hasRealData[currentMonth] = true;
+      console.log(`No entries with timestamps, setting current month ${currentMonth+1} to total views: ${monthlyViews[currentMonth]}`);
+      
+      // Set other months to have minimal value just for visualization (1-5% of the main value)
+      const minBarValue = Math.max(1, Math.floor((analyticsData.views || 100) * 0.02));
+      for (let i = 0; i < 12; i++) {
+        if (i !== currentMonth) {
+          // Set display height value, but they don't have real data
+          monthlyViews[i] = minBarValue;
+          hasRealData[i] = false;
+        }
+      }
+    }
+    
+    return { monthlyViews, hasRealData };
+  }, [analyticsData]);
+  
   // Get the monthly stats data - moved inside useEffect to avoid hooks ordering issues
   useEffect(() => {
     const { monthlyStats, hasRealData } = getMonthlyStats();
@@ -183,6 +399,14 @@ export default function HomeScreen() {
     setSelectedMonthHasData(hasRealData[selectedMonth]);
     console.log(`Selected month ${selectedMonth+1} value updated to: ${monthlyStats[selectedMonth]}`);
   }, [analyticsData, selectedMonth, getMonthlyStats]);
+  
+  // Get the monthly views data in a similar useEffect
+  useEffect(() => {
+    const { monthlyViews, hasRealData } = getMonthlyViewsData();
+    setSelectedMonthViewsValue(monthlyViews[selectedViewsMonth]);
+    setSelectedMonthViewsHasData(hasRealData[selectedViewsMonth]);
+    console.log(`Selected month ${selectedViewsMonth+1} views updated to: ${monthlyViews[selectedViewsMonth]}`);
+  }, [analyticsData, selectedViewsMonth, getMonthlyViewsData]);
   
   // Handler for bar press is now a constant function (not dependent on conditions)
   const handleBarPress = useCallback((monthIndex: number, monthValue: number, hasData: boolean) => {
@@ -193,7 +417,17 @@ export default function HomeScreen() {
     const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
     console.log(`Selected month bar: ${months[monthIndex]}, Stats total: ${hasData ? monthValue : 0}, Has data: ${hasData}`);
   }, []);
-
+  
+  // Update the handleViewsBarPress function to be similar to handleBarPress but for views
+  const handleViewsBarPress = useCallback((monthIndex: number, monthValue: number, hasData: boolean) => {
+    setSelectedViewsMonth(monthIndex);
+    setSelectedMonthViewsValue(monthValue);
+    setSelectedMonthViewsHasData(hasData);
+    // Update subscriber info based on selected month
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    console.log(`Selected month bar: ${months[monthIndex]}, Views total: ${hasData ? monthValue : 0}, Has data: ${hasData}`);
+  }, []);
+  
   // Function to check if a month has significant data
   const hasSignificantData = useCallback((monthValue: number, hasData: boolean) => {
     return hasData && monthValue > 0;
@@ -214,27 +448,63 @@ export default function HomeScreen() {
       const hasSignificantData = monthlyStats[index] > threshold && hasRealData[index];
       
       return {
-        value: monthlyStats[index], // Use this for the display height
+        value: monthlyStats[index], // Use actual value for dynamic height
         label: month,
         frontColor: 
-          index === selectedMonth ? '#FF4D4D' : // Selected month is bright red
-          hasRealData[index] ? 'rgba(255, 77, 77, 0.8)' : // Month with real data is semi-transparent red
-          'rgba(255, 77, 77, 0.2)', // Month with minimal/no data is very transparent
+          index === selectedMonth 
+            ? '#DF0000' // Highlighted month
+            : hasSignificantData 
+              ? 'rgba(223, 0, 0, 0.7)' // Month with significant data  
+              : 'rgba(223, 0, 0, 0.3)', // Month with minimal/no data
         onPress: () => handleBarPress(index, monthlyStats[index], hasRealData[index])
       };
     });
   }, [getMonthlyStats, selectedMonth, handleBarPress]);
+  
+  // Get bar data for views chart
+  const getMonthlyViewsBarData = useCallback(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const { monthlyViews, hasRealData } = getMonthlyViewsData();
+    const currentMonth = new Date().getMonth();
+    
+    // Find the max value for proper color contrast
+    const maxValue = Math.max(...monthlyViews);
+    const threshold = maxValue * 0.1; // 10% of max is considered "real data"
+    
+    return months.map((month, index) => {
+      // Determine if this month has significant data or just a placeholder value
+      const hasSignificantData = monthlyViews[index] > threshold && hasRealData[index];
+      
+      return {
+        value: monthlyViews[index], // Use this for the display height
+        label: month,
+        frontColor: 
+          index === selectedViewsMonth 
+            ? '#2196F3' // Highlighted month (blue for views)
+            : hasSignificantData 
+              ? 'rgba(33, 150, 243, 0.7)' // Month with significant data  
+              : 'rgba(33, 150, 243, 0.3)', // Month with minimal/no data
+        onPress: () => handleViewsBarPress(index, monthlyViews[index], hasRealData[index])
+      };
+    });
+  }, [getMonthlyViewsData, selectedViewsMonth, handleViewsBarPress]);
 
   // Calculate maxMonthlyValue based on monthlyStats
   const maxMonthlyValue = useMemo(() => {
     const { monthlyStats } = getMonthlyStats();
-    return Math.max(...monthlyStats, 1); // Ensure at least 1 to avoid division by zero
+    return Math.max(...monthlyStats, 1); // Use actual max value
   }, [getMonthlyStats]);
+  
+  // Calculate maxMonthlyViewsValue based on monthlyViews
+  const maxMonthlyViewsValue = useMemo(() => {
+    const { monthlyViews } = getMonthlyViewsData();
+    return Math.max(...monthlyViews, 1); // Ensure at least 1 to avoid division by zero
+  }, [getMonthlyViewsData]);
 
   // Update today's analytics with actual data - converted to useCallback
   const updateTodaysAnalytics = useCallback((totalData: UserAnalyticsData) => {
     // Initialize today's values to 0
-    let todayStats = 0;
+    let todayRevenue = 0;
     let todayViews = 0;
     let todayVideos = 0;
     let todayPremiumViews = 0;
@@ -274,7 +544,7 @@ export default function HomeScreen() {
       if (todayEntries.length > 0) {
         console.log('Found today\'s entries:', todayEntries.length);
         todayEntries.forEach(entry => {
-          todayStats += Number(entry.stats || 0);
+          todayRevenue += Number(entry.revenue || 0);
           todayViews += Number(entry.views || 0);
           todayVideos += Number(entry.videos || 0);
           todayPremiumViews += Number(entry.premium_country_views || 0);
@@ -292,14 +562,14 @@ export default function HomeScreen() {
     
     // Set today's analytics with the calculated values (zeros if no today's data)
     setDailyAnalyticsData({
-      stats: todayStats,
+      revenue: todayRevenue,
       views: todayViews,
       videos: todayVideos,
       premium_country_views: todayPremiumViews
     });
     
     console.log('Updated today\'s analytics:', {
-      stats: todayStats,
+      revenue: todayRevenue,
       views: todayViews,
       videos: todayVideos,
       premium_country_views: todayPremiumViews
@@ -378,13 +648,76 @@ export default function HomeScreen() {
     }
   };
 
+  // In the HomeScreen component, add these export functions
+  const exportRevenueData = async () => {
+    try {
+      const { monthlyStats, hasRealData } = getMonthlyStats();
+      const result = await generatePDF({ monthlyStats, hasRealData }, 'revenue');
+      
+      if (result.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Export Successful',
+          text2: 'Revenue data has been exported',
+          position: 'bottom'
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Export Failed',
+          text2: result.error || 'Could not export data',
+          position: 'bottom'
+        });
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Export Failed',
+        text2: 'An error occurred while exporting data',
+        position: 'bottom'
+      });
+    }
+  };
+
+  const exportViewsData = async () => {
+    try {
+      const { monthlyViews, hasRealData } = getMonthlyViewsData();
+      const result = await generatePDF({ monthlyViews, hasRealData }, 'views');
+      
+      if (result.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Export Successful',
+          text2: 'Views data has been exported',
+          position: 'bottom'
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Export Failed',
+          text2: result.error || 'Could not export data',
+          position: 'bottom'
+        });
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Export Failed',
+        text2: 'An error occurred while exporting data',
+        position: 'bottom'
+      });
+    }
+  };
+
   // Remove early returns and use conditional rendering instead
-    return (
+  return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
       {isLoading ? (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#DF0000" />
+          <ActivityIndicator size="large" color="#DF0000" />
         <Text style={styles.loadingText}>Loading...</Text>
       </View>
       ) : !user ? (
@@ -428,14 +761,14 @@ export default function HomeScreen() {
           <View style={styles.analyticsRow}>
             <View style={styles.analyticsBox}>
               <View style={styles.analyticsHeader}>
-                <Text style={styles.analyticsTitle}>Stats</Text>
+                <Text style={styles.analyticsTitle}>Revenue</Text>
                 <Ionicons name="today-outline" size={18} color="#777" />
               </View>
               <Text style={styles.analyticsValue}>
                 {isLoadingAnalytics ? (
                   <ActivityIndicator size="small" color="#DF0000" />
                 ) : (
-                  formatNumber(dailyAnalyticsData.stats)
+                  formatNumber(dailyAnalyticsData.revenue)
                 )}
           </Text>
               <View style={styles.analyticsFooter}>
@@ -502,7 +835,7 @@ export default function HomeScreen() {
             {/* Header with standard dropdown */}
             <View style={styles.analyticsHeader}>
               <View style={styles.analyticsHeaderTitleContainer}>
-                <Text style={styles.analyticsHeaderTitle}>Total Analytics</Text>
+                <Text style={styles.analyticsHeaderTitle}>Total Revenue</Text>
                 
                 {/* Standard dropdown select */}
                 <View style={styles.selectContainer}>
@@ -575,13 +908,13 @@ export default function HomeScreen() {
               ) : (
                 <>
                   <View style={styles.detailedCardsRow}>
-                    {/* Stats Card */}
+                    {/* Revenue Card */}
                     <View style={styles.detailedCard}>
-                      <Text style={styles.cardTitle}>Stats</Text>
-                      <Text style={styles.cardValue}>{formatNumber(analyticsData.stats || 0)}</Text>
+                      <Text style={styles.cardTitle}>Revenue</Text>
+                      <Text style={styles.cardValue}>{formatNumber(analyticsData.revenue || 0)}</Text>
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
-                        <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.stats || 0) / 28))} / day</Text>
+                        <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.revenue || 0) / 28))} / day</Text>
                       </View>
                     </View>
                     
@@ -592,10 +925,10 @@ export default function HomeScreen() {
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
                         <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.videos || 0) / 28))} / day</Text>
-                      </View>
-                    </View>
-                  </View>
-                    
+            </View>
+          </View>
+        </View>
+        
                   <View style={styles.detailedCardsRow}>
                     {/* Views Card */}
                     <View style={styles.detailedCard}>
@@ -630,10 +963,10 @@ export default function HomeScreen() {
                   ${formatNumber(selectedMonthHasData ? selectedMonthValue : 0)}
                 </Text>
                 <Text style={styles.redHeaderText}>
-                  {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]} Total Stats
+                  {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]} Total Revenue
                 </Text>
               </View>
-              <TouchableOpacity style={styles.redHeaderMoreBtn} onPress={() => setShowChartOptions(!showChartOptions)}>
+              <TouchableOpacity style={styles.redHeaderMoreBtn} onPress={() => setShowRevenueChartOptions(!showRevenueChartOptions)}>
                 <Feather name="more-horizontal" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
@@ -643,16 +976,16 @@ export default function HomeScreen() {
               <View style={styles.notificationHeader}>
                 <Text style={styles.dateText}>
                   Monthly Summary for {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}
-              </Text>
-            </View>
+                </Text>
+              </View>
               <View style={styles.notificationContent}>
                 <Text style={styles.notificationText}>
-                  In {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}, your <Text style={styles.blueText}>total stats</Text> 
+                  In {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedMonth]}, your <Text style={styles.blueText}>total revenue</Text> 
                   {(() => {
                     // Calculate previous month's index (with wraparound to December if current is January)
                     const prevMonthIndex = selectedMonth > 0 ? selectedMonth - 1 : 11;
                     
-                    // Get current and previous month stats
+                    // Get current and previous month revenue
                     const currentMonthValue = selectedMonthHasData ? selectedMonthValue : 0;
                     
                     // Find previous month value from analytics entries
@@ -676,7 +1009,7 @@ export default function HomeScreen() {
                       
                       // If we found entries for previous month, sum them up
                       if (prevMonthEntries.length > 0) {
-                        prevMonthValue = prevMonthEntries.reduce((sum, entry) => sum + Number(entry.stats || 0), 0);
+                        prevMonthValue = prevMonthEntries.reduce((sum, entry) => sum + Number(entry.revenue || 0), 0);
                       } else {
                         // No entries found for previous month, use 80-90% of current month as estimate
                         prevMonthValue = Math.round(currentMonthValue * 0.85);
@@ -706,20 +1039,28 @@ export default function HomeScreen() {
               </View>
             </View>
             
-            {/* Chart Options Popup */}
-            {showChartOptions && (
+            {/* Chart Options Popup - Revenue Chart */}
+            {showRevenueChartOptions && (
               <View style={styles.chartOptionsContainer}>
-                <TouchableOpacity style={styles.chartOption}>
+                <TouchableOpacity style={styles.chartOption} onPress={() => {
+                  exportRevenueData();
+                  setShowRevenueChartOptions(false);
+                }}>
                   <Feather name="download" size={18} color="#fff" />
                   <Text style={styles.chartOptionText}>Export Data</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.chartOption}>
+                <TouchableOpacity style={[styles.chartOption, {borderBottomWidth: 0}]} onPress={() => {
+                  refreshData();
+                  setShowRevenueChartOptions(false);
+                  Toast.show({
+                    type: 'success',
+                    text1: 'Refreshed',
+                    text2: 'Analytics data has been updated',
+                    position: 'bottom'
+                  });
+                }}>
                   <Feather name="refresh-cw" size={18} color="#fff" />
                   <Text style={styles.chartOptionText}>Refresh</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.chartOption}>
-                  <Feather name="settings" size={18} color="#fff" />
-                  <Text style={styles.chartOptionText}>Settings</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -745,37 +1086,136 @@ export default function HomeScreen() {
             </View>
           </View>
           
-          {/* Monthly Views Chart - Temporarily disabled due to missing functions */}
-          {/* 
-          <View style={[styles.chartContainer, {backgroundColor: '#212121'}]}>
-            <View style={styles.redHeader}>
+          {/* Monthly Views Chart */}
+          <View style={[styles.chartContainer, {backgroundColor: '#212121', marginTop: 20}]}>
+            <View style={[styles.redHeader, {backgroundColor: 'rgba(33, 150, 243, 0.2)'}]}>
               <View style={styles.redHeaderTextContainer}>
                 <Text style={styles.redHeaderAmount}>
-                  {formatNumber(selectedMonthHasData ? 0 : 0)}
+                  {formatNumber(selectedMonthViewsHasData ? selectedMonthViewsValue : 0)}
                 </Text>
                 <Text style={styles.redHeaderText}>
-                  Views Generated
+                  {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedViewsMonth]} Total Views
                 </Text>
               </View>
-              <TouchableOpacity style={styles.redHeaderMoreBtn} onPress={() => setShowChartOptions(!showChartOptions)}>
+              <TouchableOpacity style={styles.redHeaderMoreBtn} onPress={() => setShowViewsChartOptions(!showViewsChartOptions)}>
                 <Feather name="more-horizontal" size={24} color="#fff" />
               </TouchableOpacity>
             </View>
             
+            {/* Screenshot-style notification */}
             <View style={styles.notificationContainer}>
               <View style={styles.notificationHeader}>
                 <Text style={styles.dateText}>
-                  {['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][selectedMonth]} {new Date().getDate()}'
+                  Monthly Summary for {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedViewsMonth]}
                 </Text>
               </View>
               <View style={styles.notificationContent}>
                 <Text style={styles.notificationText}>
-                  Monthly views data unavailable.
+                  In {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][selectedViewsMonth]}, your <Text style={styles.blueText}>total views</Text> 
+                  {(() => {
+                    // Calculate previous month's index (with wraparound to December if current is January)
+                    const prevMonthIndex = selectedViewsMonth > 0 ? selectedViewsMonth - 1 : 11;
+                    
+                    // Get current month views
+                    const currentMonthViews = selectedMonthViewsHasData ? selectedMonthViewsValue : 0;
+                    
+                    // Find previous month value from analytics entries
+                    let prevMonthViews = 0;
+                    if (analyticsData.entries && Array.isArray(analyticsData.entries)) {
+                      // Try to find an entry for the previous month
+                      const prevMonthEntries = analyticsData.entries.filter(entry => {
+                        if (entry.created_at) {
+                          try {
+                            const dateStr = entry.created_at.toString();
+                            const prevMonthStr = prevMonthIndex < 9 
+                              ? `-0${prevMonthIndex + 1}-` 
+                              : `-${prevMonthIndex + 1}-`;
+                            return dateStr.includes(prevMonthStr);
+                          } catch (e) {
+                            return false;
+                          }
+                        }
+                        return false;
+                      });
+                      
+                      // If we found entries for previous month, sum them up
+                      if (prevMonthEntries.length > 0) {
+                        prevMonthViews = prevMonthEntries.reduce((sum, entry) => sum + Number(entry.views || 0), 0);
+                      } else {
+                        // No entries found for previous month, use 80-90% of current month as estimate
+                        prevMonthViews = Math.round(currentMonthViews * 0.85);
+                      }
+                    }
+                    
+                    // Calculate difference
+                    const difference = currentMonthViews - prevMonthViews;
+                    const percentChange = prevMonthViews > 0 ? Math.round((difference / prevMonthViews) * 100) : 0;
+                    
+                    // Return appropriate message based on change
+                    if (difference > 0) {
+                      return (
+                        <> increased by <Text style={styles.greenText}>{formatNumber(difference)}</Text> ({percentChange}%). Great progress!</>
+                      );
+                    } else if (difference < 0) {
+                      return (
+                        <> decreased by <Text style={styles.redText}>{formatNumber(Math.abs(difference))}</Text> ({Math.abs(percentChange)}%). Need to improve strategy.</> 
+                      );
+                    } else {
+                      return (
+                        <> remained the same as last month. Time to try new tactics!</>
+                      );
+                    }
+                  })()}
                 </Text>
               </View>
             </View>
+            
+            {/* Chart Options Popup - Views Chart */}
+            {showViewsChartOptions && (
+              <View style={styles.chartOptionsContainer}>
+                <TouchableOpacity style={styles.chartOption} onPress={() => {
+                  exportViewsData();
+                  setShowViewsChartOptions(false);
+                }}>
+                  <Feather name="download" size={18} color="#fff" />
+                  <Text style={styles.chartOptionText}>Export Data</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.chartOption, {borderBottomWidth: 0}]} onPress={() => {
+                  refreshData();
+                  setShowViewsChartOptions(false);
+                  Toast.show({
+                    type: 'success',
+                    text1: 'Refreshed',
+                    text2: 'Analytics data has been updated',
+                    position: 'bottom'
+                  });
+                }}>
+                  <Feather name="refresh-cw" size={18} color="#fff" />
+                  <Text style={styles.chartOptionText}>Refresh</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+            
+            <View style={styles.chartWrapper}>
+              <BarChart
+                data={getMonthlyViewsBarData()}
+                width={screenWidth - 80}
+                height={220}
+                barWidth={30}
+                spacing={18}
+                barBorderRadius={4}
+                hideRules
+                xAxisThickness={0}
+                yAxisThickness={0}
+                hideYAxisText
+                noOfSections={3}
+                maxValue={maxMonthlyViewsValue * 1.2}
+                labelWidth={30}
+                xAxisLabelTextStyle={{color: '#ccc', textAlign: 'center'}}
+                hideOrigin
+              />
+            </View>
           </View>
-          */}
           
           {/* Subscribers Chart - Temporarily disabled due to missing functions */}
           {/*
@@ -1160,8 +1600,8 @@ const styles = StyleSheet.create({
   },
   chartOptionsContainer: {
     position: 'absolute',
-    top: 40,
-    right: 0,
+    top: 50,
+    right: 15,
     backgroundColor: '#333',
     borderRadius: 8,
     padding: 5,

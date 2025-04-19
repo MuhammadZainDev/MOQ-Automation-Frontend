@@ -198,7 +198,7 @@ export default function VerificationCodeScreen() {
           {loading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.submitButtonText}>Verify Code</Text>
+          <Text style={styles.submitButtonText}>Verify Code</Text>
           )}
         </TouchableOpacity>
         
@@ -208,9 +208,9 @@ export default function VerificationCodeScreen() {
             {resending ? (
               <ActivityIndicator size="small" color="#DF0000" />
             ) : (
-              <Text style={styles.resendButton}>Resend</Text>
+          <Text style={styles.resendButton}>Resend</Text>
             )}
-          </TouchableOpacity>
+        </TouchableOpacity>
         </View>
       </View>
     </ScrollView>

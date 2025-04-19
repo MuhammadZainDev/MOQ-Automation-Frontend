@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 type AnalyticsEntry = {
   views?: number;
   videos?: number;
-  stats?: number;
+  revenue?: number;
   premium_country_views?: number;
   created_at?: string;
   [key: string]: any;
@@ -18,7 +18,7 @@ type AnalyticsEntry = {
 type AnalyticsData = {
   views?: number;
   videos?: number;
-  stats?: number;
+  revenue?: number;
   premium_country_views?: number;
   entries?: AnalyticsEntry[];
   [key: string]: any;
@@ -27,7 +27,7 @@ type AnalyticsData = {
 type HistoryItem = {
   id: number;
   date: string;
-  stats: number;
+  revenue: number;
   status: string;
   source: string;
   timestamp?: Date;
@@ -57,8 +57,8 @@ export default function StatsScreen() {
   
   // Get current items for pagination
   const getCurrentItems = () => {
-    // First filter out items with stats value of 0
-    const nonZeroItems = statsData.history.filter(item => item.stats > 0);
+    // First filter out items with revenue value of 0
+    const nonZeroItems = statsData.history.filter(item => item.revenue > 0);
     
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -89,41 +89,41 @@ export default function StatsScreen() {
     fetchAnalytics();
   }, []);
 
-  // Process analytics data to get stats
+  // Process analytics data to get revenue
   const processStatsData = (data: AnalyticsData): void => {
     if (!data) {
       setStatsData({ total: 0, history: [] });
       return;
     }
 
-    // Get total stats directly from the analytics response
-    const totalStats = data.stats || 0;
+    // Get total revenue directly from the analytics response
+    const totalRevenue = data.revenue || 0;
 
-    // Generate stats history from entries if available
+    // Generate revenue history from entries if available
     let history: HistoryItem[] = [];
 
     if (data.entries && data.entries.length > 0) {
-      // Convert entries to history items - use exact stats values from entries
-      // and filter out entries with 0 stats
+      // Convert entries to history items - use exact revenue values from entries
+      // and filter out entries with 0 revenue
       history = data.entries
-        .filter(entry => (entry.stats || 0) > 0)
+        .filter(entry => (entry.revenue || 0) > 0)
         .map((entry, index) => {
-          const entryStats = entry.stats || 0;
+          const entryRevenue = entry.revenue || 0;
           const createdAt = entry.created_at ? new Date(entry.created_at) : new Date();
           
           return {
             id: index,
             date: createdAt.toLocaleDateString(),
-            stats: entryStats,
+            revenue: entryRevenue,
             status: 'Recorded',
-            source: 'YouTube Stats',
+            source: 'YouTube Revenue',
             timestamp: createdAt
           };
         }).reverse(); // Most recent first
     }
 
     setStatsData({
-      total: totalStats,
+      total: totalRevenue,
       history: history
     });
   };
@@ -133,7 +133,7 @@ export default function StatsScreen() {
       <SafeAreaView style={styles.safeAreaContainer}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#DF0000" />
-          <Text style={styles.loadingText}>Loading stats data...</Text>
+          <Text style={styles.loadingText}>Loading revenue data...</Text>
         </View>
       </SafeAreaView>
     );
@@ -167,18 +167,18 @@ export default function StatsScreen() {
                 style={styles.logo}
                 resizeMode="contain"
               />
-              <Text style={styles.headerTitle}>Your Stats</Text>
+              <Text style={styles.headerTitle}>Your Revenue</Text>
             </View>
             <Text style={styles.totalStats}>{"$" + " " + formatNumber(statsData.total)}</Text>
-            <Text style={styles.statsPeriod}>Total earning in this year</Text>
+            <Text style={styles.statsPeriod}>Total revenue in this year</Text>
           </View>
         </SafeAreaView>
       </LinearGradient>
 
       <ScrollView style={styles.scrollContent}>
-        {/* Stats history */}
+        {/* Revenue history */}
         <View style={styles.historySection}>
-          <Text style={styles.sectionTitle}>Stats History</Text>
+          <Text style={styles.sectionTitle}>Revenue History</Text>
           
           {statsData.history.length > 0 ? (
             <>
@@ -190,13 +190,13 @@ export default function StatsScreen() {
                       <Text style={styles.historyDate}>{item.date}</Text>
                     </View>
                     <View style={styles.historyDetails}>
-                      <Text style={styles.historySource}>YouTube Stats</Text>
+                      <Text style={styles.historySource}>YouTube Revenue</Text>
                       <Text style={styles.statusRecorded}>
                         Recorded
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.historyStats}>{"$" + formatNumber(item.stats)}</Text>
+                  <Text style={styles.historyStats}>{"$" + formatNumber(item.revenue)}</Text>
                 </View>
               ))}
               
@@ -228,7 +228,7 @@ export default function StatsScreen() {
           ) : (
             <View style={styles.emptyHistory}>
               <Ionicons name="bar-chart-outline" size={50} color="#444" />
-              <Text style={styles.emptyHistoryText}>No stats found</Text>
+              <Text style={styles.emptyHistoryText}>No revenue data found</Text>
             </View>
           )}
         </View>
