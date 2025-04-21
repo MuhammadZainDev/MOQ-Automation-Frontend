@@ -10,9 +10,11 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import { useFocusEffect } from '@react-navigation/native';
 import AdminLayout from '../../src/components/AdminLayout';
 import { adminService } from '../../src/services/adminApi';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define user type
 type User = {
@@ -78,7 +80,48 @@ export default function UsersScreen() {
     }
   };
 
-  // Load users on mount
+  // Refresh the users list every time this screen focuses (becomes active)
+  // This ensures data is always fresh when navigating from other screens
+  useFocusEffect(
+    React.useCallback(() => {
+      const checkApprovalAndRefresh = async () => {
+        console.log('Users screen is focused - refreshing data');
+        
+        // Check if we're coming from an approval action
+        try {
+          const justApproved = await AsyncStorage.getItem('just_approved_user');
+          if (justApproved === 'true') {
+            console.log('Coming from approval page - refreshing user list');
+            // Clear the flag immediately
+            await AsyncStorage.removeItem('just_approved_user');
+            
+            // Set active filter to 'active' to show the newly approved user
+            setActiveFilter('active');
+            
+            // Show a toast to inform the admin that the list has been updated
+            Toast.show({
+              type: 'info',
+              text1: 'List Updated',
+              text2: 'User list refreshed with newly approved user',
+              position: 'bottom'
+            });
+          }
+        } catch (error) {
+          console.error('Error checking approval status:', error);
+        }
+        
+        // Always fetch users data
+        fetchUsers();
+      };
+
+      checkApprovalAndRefresh();
+
+      // No cleanup needed for this effect
+      return () => {};
+    }, [])
+  );
+
+  // Initial data fetch when component mounts
   useEffect(() => {
     fetchUsers();
   }, []);

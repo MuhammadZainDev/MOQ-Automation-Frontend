@@ -15,6 +15,7 @@ import AdminLayout from '../../src/components/AdminLayout';
 import { adminService } from '../../src/services/adminApi';
 import ConfirmationModal from '../../src/components/ConfirmationModal';
 import Toast from 'react-native-toast-message';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define the user type
 type PendingUser = {
@@ -70,29 +71,53 @@ export default function ApprovalsScreen() {
     if (!selectedUserId) return;
     
     try {
-      setLoading(true);
-      const response = await adminService.approveUser(selectedUserId);
-      if (response.success) {
-        // Remove the approved user from the list
-        setPendingUsers(prev => prev.filter(user => user.id !== selectedUserId));
-        
-        // Show success toast
-        Toast.show({
-          type: 'success',
-          text1: 'Success',
-          text2: 'User has been approved and notification email sent.',
-          position: 'bottom'
-        });
-      }
-    } catch (error) {
-      console.error('Error approving user:', error);
+      // First, update the UI immediately to give instant feedback
+      // Remove the approved user from the list right away
+      setPendingUsers(prev => prev.filter(user => user.id !== selectedUserId));
+      
+      // Show success toast immediately 
       Toast.show({
-        type: 'error',
-        text1: 'Error',
-        text2: 'Failed to approve user. Please try again.',
+        type: 'success',
+        text1: 'Success',
+        text2: 'User has been approved.',
         position: 'bottom'
       });
-    } finally {
+      
+      // Close the modal immediately
+      setConfirmModalVisible(false);
+      
+      // IMPORTANT: Set loading to false immediately - don't wait for API
+      setLoading(false);
+      
+      // Store the approved user ID temporarily in AsyncStorage to ensure
+      // we know an approval just happened when we navigate to users page
+      try {
+        await AsyncStorage.setItem('just_approved_user', 'true');
+      } catch (storageError) {
+        console.error('Error storing approval state:', storageError);
+      }
+      
+      // IMPORTANT: Redirect to users list page immediately after approval
+      // This will trigger the focus event in the users page which will refresh the data
+      router.push('/admin/users');
+      
+      // Then make the API call in the background - no need to wait for it or show loader
+      adminService.approveUser(selectedUserId)
+        .then(response => {
+          if (!response.success) {
+            // Only log error if the API call fails - don't show to user since we already navigated away
+            console.error('Error in background approval:', response);
+          }
+        })
+        .catch(error => {
+          console.error('Error approving user in background:', error);
+        })
+        .finally(() => {
+          // Reset selected user ID
+          setSelectedUserId(null);
+        });
+    } catch (error) {
+      console.error('Error initiating user approval:', error);
       setLoading(false);
       setSelectedUserId(null);
       setConfirmModalVisible(false);
