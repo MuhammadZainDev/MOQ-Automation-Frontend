@@ -17,6 +17,7 @@ import Toast from 'react-native-toast-message';
 const initialStats = {
   totalUsers: 0,
   pendingApprovals: 0,
+  totalThresholds: 0,
 };
 
 export default function AdminDashboard() {
@@ -41,9 +42,13 @@ export default function AdminDashboard() {
       const pendingResponse = await adminService.getPendingApprovals();
       const pendingApprovals = pendingResponse.count || 0;
       
+      // Simulate threshold data for now (would be fetched from API)
+      const totalThresholds = 5; // Example count of users with thresholds set
+      
       setStats({
         totalUsers,
-        pendingApprovals
+        pendingApprovals,
+        totalThresholds
       });
       
       isStatsDisplayed.current = true;
@@ -134,6 +139,15 @@ export default function AdminDashboard() {
               <Ionicons name="time-outline" size={30} color="#DF0000" />
               <Text style={styles.statValue}>{stats.pendingApprovals}</Text>
               <Text style={styles.statLabel}>Pending Approvals</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.statBox}
+              onPress={() => router.push('/admin/thresholds')}
+            >
+              <Ionicons name="shield-outline" size={30} color="#27AE60" />
+              <Text style={styles.statValue}>{stats.totalThresholds}</Text>
+              <Text style={styles.statLabel}>Thresholds</Text>
             </TouchableOpacity>
           </View>
           

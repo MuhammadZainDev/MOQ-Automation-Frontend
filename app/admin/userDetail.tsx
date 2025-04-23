@@ -9,7 +9,8 @@ import {
   TextInput,
   SafeAreaView,
   StatusBar,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -108,6 +109,11 @@ export default function UserDetailScreen() {
   const [toggleLoading, setToggleLoading] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [showRevenueTypeDropdown, setShowRevenueTypeDropdown] = useState(false);
+  
+  // Modify notification states - remove message state
+  const [notificationModalVisible, setNotificationModalVisible] = useState(false);
+  const [notificationTitle, setNotificationTitle] = useState('Your data has been updated');
+  const [sendingNotification, setSendingNotification] = useState(false);
 
   // Fetch user details and analytics
   useEffect(() => {
@@ -322,6 +328,61 @@ export default function UserDetailScreen() {
     
     // Show custom confirmation modal
     setConfirmModalVisible(true);
+  };
+
+  const handleSendNotification = async () => {
+    try {
+      setSendingNotification(true);
+      
+      // Validate input
+      if (!notificationTitle.trim()) {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: 'Please enter a notification title',
+          position: 'bottom'
+        });
+        setSendingNotification(false);
+        return;
+      }
+      
+      // Use our new simpler notification method
+      const response = await adminService.sendSimpleNotification(userId, notificationTitle);
+      
+      if (response.success) {
+        // Close modal
+        setNotificationModalVisible(false);
+        
+        // Show success message with longer duration
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: `Notification "${notificationTitle}" sent to ${user?.name}`,
+          position: 'bottom',
+          visibilityTime: 4000
+        });
+        
+        // Reset to default value
+        setNotificationTitle('Your data has been updated');
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: response.message || 'Failed to send notification',
+          position: 'bottom'
+        });
+      }
+    } catch (error) {
+      console.error('Error sending notification:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Failed to send notification',
+        position: 'bottom'
+      });
+    } finally {
+      setSendingNotification(false);
+    }
   };
 
   if (loading) {
@@ -556,6 +617,15 @@ export default function UserDetailScreen() {
             </TouchableOpacity>
           </View>
           
+          {/* Send Notification Button - add after toggle button */}
+          <TouchableOpacity 
+            style={styles.notificationButton} 
+            onPress={() => setNotificationModalVisible(true)}
+          >
+            <Ionicons name="notifications-outline" size={22} color="#fff" style={styles.buttonIcon} />
+            <Text style={styles.buttonText}>Send Notification</Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity 
             style={[
               styles.saveButton, 
@@ -585,6 +655,57 @@ export default function UserDetailScreen() {
           confirmText={user?.isActive ? 'Deactivate' : 'Activate'}
           cancelText="Cancel"
         />
+        
+        {/* Notification Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={notificationModalVisible}
+          onRequestClose={() => setNotificationModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Send Notification</Text>
+                <TouchableOpacity 
+                  onPress={() => setNotificationModalVisible(false)}
+                  disabled={sendingNotification}
+                >
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.modalBody}>
+                <Text style={styles.modalLabel}>Notification Title</Text>
+                <View style={styles.modalInputContainer}>
+                  <TextInput 
+                    style={styles.modalInput} 
+                    placeholder="Enter notification title" 
+                    placeholderTextColor="#777"
+                    value={notificationTitle}
+                    onChangeText={setNotificationTitle}
+                    editable={!sendingNotification}
+                  />
+                </View>
+                
+                <TouchableOpacity 
+                  style={[styles.sendButton, sendingNotification && styles.savingButton]} 
+                  onPress={handleSendNotification}
+                  disabled={sendingNotification}
+                >
+                  {sendingNotification ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <>
+                      <Ionicons name="send-outline" size={20} color="#fff" style={styles.buttonIcon} />
+                      <Text style={styles.sendButtonText}>Send Notification</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </CustomLayout>
   );
@@ -918,5 +1039,89 @@ const styles = StyleSheet.create({
   selectedOptionText: {
     color: '#FFF',
     fontWeight: 'bold',
+  },
+  
+  // New styles for notification button and modal
+  notificationButton: {
+    backgroundColor: '#2F80ED',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: 10,
+    marginBottom: 15,
+    height: 55,
+  },
+  buttonIcon: {
+    marginRight: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    width: '90%',
+    backgroundColor: '#212121',
+    borderRadius: 10,
+    padding: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  modalTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  modalBody: {
+    marginBottom: 10,
+  },
+  modalLabel: {
+    color: '#aaa',
+    marginBottom: 8,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  modalInputContainer: {
+    backgroundColor: '#333',
+    borderRadius: 8,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#444',
+  },
+  modalInput: {
+    padding: 12,
+    color: '#fff',
+    fontSize: 16,
+  },
+  messageInput: {
+    height: 100,
+    textAlignVertical: 'top',
+  },
+  sendButton: {
+    backgroundColor: '#2F80ED',
+    borderRadius: 8,
+    padding: 16,
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    height: 55,
+  },
+  sendButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 }); 

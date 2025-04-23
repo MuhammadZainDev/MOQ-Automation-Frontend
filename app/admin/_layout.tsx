@@ -98,6 +98,20 @@ export default function AdminLayout() {
             title: 'User Details'
           }} 
         />
+        <Stack.Screen 
+          name="thresholds" 
+          options={{ 
+            headerShown: false,
+            title: 'User Thresholds'
+          }} 
+        />
+        <Stack.Screen 
+          name="thresholdDetail" 
+          options={{ 
+            headerShown: false,
+            title: 'Threshold Details'
+          }} 
+        />
       </Stack>
     </AdminProtectedRoute>
   );
