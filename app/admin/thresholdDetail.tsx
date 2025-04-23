@@ -7,71 +7,45 @@ import {
   ActivityIndicator,
   ScrollView,
   TextInput,
-  SafeAreaView,
-  StatusBar,
   Alert,
-  Switch
+  FlatList,
+  RefreshControl
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { adminService } from '../../src/services/adminApi';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../src/context/AuthContext';
+import { 
+  getThresholdById, 
+  updateThreshold, 
+  deleteThreshold, 
+  addThresholdEntry 
+} from '../../src/services/thresholdApi';
+import AdminLayout from '../../src/components/AdminLayout';
 
-// Progress bar component
-const ProgressBar = ({ 
-  progress, 
-  color, 
-  height = 8 
-}: { 
-  progress: number; 
-  color?: string;
-  height?: number;
-}) => {
-  return (
-    <View style={[styles.progressContainer, { height }]}>
-      <View 
-        style={[
-          styles.progressFill, 
-          { 
-            width: `${Math.min(progress, 100)}%`,
-            backgroundColor: color || '#DF0000'
-          }
-        ]} 
-      />
-    </View>
-  );
-};
-
-// Type for threshold detail
+// Define detailed threshold type
 type ThresholdDetail = {
   id: string;
   name: string;
   amount: number;
-  current: number;
-  progress: number;
   createdAt: string;
-  type: 'youtube' | 'adsense' | 'music';
-  isProtectionEnabled: boolean;
-  description?: string;
-  history?: {
-    date: string;
-    amount: number;
-  }[];
+  user_id: string;
+  updated_at: string;
+  user?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  entries?: ThresholdEntry[];
+  current_amount?: number;
 };
 
-// Helper to get color by threshold type
-const getColorByType = (type: string): string => {
-  switch (type) {
-    case 'youtube':
-      return '#DF0000';
-    case 'music':
-      return '#2F80ED';
-    case 'adsense':
-      return '#27AE60';
-    default:
-      return '#DF0000';
-  }
+type ThresholdEntry = {
+  id: string;
+  threshold_id: string;
+  amount: number;
+  created_at: string;
 };
 
 // Custom layout component without the header for this page
@@ -85,25 +59,20 @@ function CustomLayout({ children }: { children: React.ReactNode }) {
   };
   
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#000" />
-      
-      {/* Only include the MOQ Admin and logout without the manage users header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>MOQ Admin</Text>
-        <TouchableOpacity 
-          style={styles.logoutButton}
-          onPress={handleLogout}
-        >
-          <Ionicons name="log-out-outline" size={22} color="#fff" />
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
-      
-      <View style={styles.content}>
+    <AdminLayout>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Threshold Details</Text>
+        </View>
         {children}
       </View>
-    </View>
+    </AdminLayout>
   );
 }
 
@@ -112,159 +81,194 @@ export default function ThresholdDetailScreen() {
   const params = useLocalSearchParams();
   const thresholdId = params.id as string;
   
-  const [threshold, setThreshold] = useState<ThresholdDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [savingSettings, setSavingSettings] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [threshold, setThreshold] = useState<ThresholdDetail | null>(null);
+  const [editMode, setEditMode] = useState(false);
   
-  // Form state
-  const [isProtectionEnabled, setIsProtectionEnabled] = useState(false);
-  const [thresholdName, setThresholdName] = useState('');
-  const [thresholdAmount, setThresholdAmount] = useState('');
-  const [thresholdDescription, setThresholdDescription] = useState('');
+  // Editing fields
+  const [editData, setEditData] = useState({
+    name: '',
+    amount: ''
+  });
   
-  // Fetch threshold data
-  useEffect(() => {
-    const fetchThresholdData = async () => {
-      try {
-        setLoading(true);
-        
-        // Simulate API call to get threshold
-        setTimeout(() => {
-          // Generate fake data
-          const fakeThreshold: ThresholdDetail = {
-            id: thresholdId,
-            name: thresholdId === '1' ? 'YouTube Basic Income' : 
-                  thresholdId === '2' ? 'Music Revenue Target' : 
-                  thresholdId === '3' ? 'AdSense Minimum' : 
-                  thresholdId === '4' ? 'YouTube Premium' : 
-                  'Monthly Music Goal',
-            amount: thresholdId === '1' ? 100 : 
-                    thresholdId === '2' ? 500 : 
-                    thresholdId === '3' ? 250 : 
-                    thresholdId === '4' ? 1000 : 300,
-            current: thresholdId === '1' ? 76 : 
-                    thresholdId === '2' ? 320 : 
-                    thresholdId === '3' ? 150 : 
-                    thresholdId === '4' ? 450 : 290,
-            progress: thresholdId === '1' ? 76 : 
-                      thresholdId === '2' ? 64 : 
-                      thresholdId === '3' ? 60 : 
-                      thresholdId === '4' ? 45 : 97,
-            createdAt: thresholdId === '1' ? '2023-10-15' : 
-                      thresholdId === '2' ? '2023-11-01' : 
-                      thresholdId === '3' ? '2023-09-22' : 
-                      thresholdId === '4' ? '2023-10-05' : '2023-11-10',
-            type: thresholdId === '1' ? 'youtube' : 
-                  thresholdId === '2' ? 'music' : 
-                  thresholdId === '3' ? 'adsense' : 
-                  thresholdId === '4' ? 'youtube' : 'music',
-            isProtectionEnabled: Math.random() > 0.5,
-            description: "This threshold represents the minimum revenue target for content creators. When enabled, protection features activate once the threshold is reached.",
-            history: [
-              { date: '2023-11-01', amount: 25 },
-              { date: '2023-11-08', amount: 45 },
-              { date: '2023-11-15', amount: 65 },
-              { date: '2023-11-22', amount: 85 },
-              { date: '2023-11-29', amount: 95 }
-            ]
-          };
-          
-          setThreshold(fakeThreshold);
-          setIsProtectionEnabled(fakeThreshold.isProtectionEnabled);
-          setThresholdName(fakeThreshold.name);
-          setThresholdAmount(fakeThreshold.amount.toString());
-          setThresholdDescription(fakeThreshold.description || '');
-          
-          setLoading(false);
-        }, 1000);
-      } catch (error) {
-        console.error('Error fetching threshold data:', error);
+  // Add entry fields
+  const [entryAmount, setEntryAmount] = useState('');
+  
+  // Load threshold data
+  const fetchThresholdData = async () => {
+    if (!thresholdId) return;
+    
+    try {
+      setLoading(true);
+      const response = await getThresholdById(thresholdId);
+      
+      if (response.success && response.data) {
+        setThreshold(response.data);
+        // Initialize edit data
+        setEditData({
+          name: response.data.name,
+          amount: response.data.amount.toString()
+        });
+      } else {
         Toast.show({
           type: 'error',
           text1: 'Error',
-          text2: 'Failed to load threshold data',
-          position: 'bottom'
+          text2: 'Failed to load threshold details',
         });
-        setLoading(false);
+        router.back(); // Navigate back if threshold not found
       }
-    };
-    
+    } catch (error) {
+      console.error('Error fetching threshold details:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error instanceof Error ? error.message : 'Failed to load threshold details',
+      });
+      router.back(); // Navigate back on error
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Fetch data on mount
+  useEffect(() => {
     if (thresholdId) {
       fetchThresholdData();
     }
   }, [thresholdId]);
-
+  
+  // Handle back button
   const handleBack = () => {
     router.back();
   };
-
+  
+  // Handle save threshold
   const handleSaveThreshold = async () => {
+    // Validate inputs
+    if (!editData.name.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Threshold name is required',
+      });
+      return;
+    }
+    
+    const amount = parseFloat(editData.amount);
+    if (isNaN(amount) || amount <= 0) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please enter a valid threshold amount',
+      });
+      return;
+    }
+    
     try {
-      setSavingSettings(true);
+      setSaving(true);
       
-      // Validate inputs - ensure they are numbers
-      if (!thresholdName.trim()) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Threshold name is required',
-          position: 'bottom'
+      // Update threshold
+      const response = await updateThreshold(thresholdId, {
+        name: editData.name,
+        amount
+      });
+      
+      if (response.success) {
+        // Update local state
+        setThreshold({
+          ...threshold!,
+          name: editData.name,
+          amount
         });
-        setSavingSettings(false);
-        return;
-      }
-      
-      const amount = parseFloat(thresholdAmount);
-      if (isNaN(amount) || amount <= 0) {
-        Toast.show({
-          type: 'error',
-          text1: 'Error',
-          text2: 'Please enter a valid threshold amount',
-          position: 'bottom'
-        });
-        setSavingSettings(false);
-        return;
-      }
-      
-      // In a real app, you would call the API to update the threshold settings
-      // For now, we'll just simulate a successful update
-      setTimeout(() => {
-        // Update the threshold object with new values
-        if (threshold) {
-          const updatedThreshold: ThresholdDetail = {
-            ...threshold,
-            name: thresholdName,
-            amount: amount,
-            isProtectionEnabled: isProtectionEnabled,
-            description: thresholdDescription,
-            progress: Math.floor((threshold.current / amount) * 100)
-          };
-          
-          setThreshold(updatedThreshold);
-        }
         
         Toast.show({
           type: 'success',
           text1: 'Success',
           text2: 'Threshold updated successfully',
-          position: 'bottom',
-          visibilityTime: 4000,
         });
         
-        setSavingSettings(false);
-      }, 1000);
+        // Exit edit mode
+        setEditMode(false);
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: response.message || 'Failed to update threshold',
+        });
+      }
     } catch (error) {
-      console.error('Error saving threshold settings:', error);
+      console.error('Error updating threshold:', error);
       Toast.show({
         type: 'error',
         text1: 'Error',
-        text2: 'Failed to save threshold settings',
-        position: 'bottom'
+        text2: error instanceof Error ? error.message : 'Failed to update threshold',
       });
-      setSavingSettings(false);
+    } finally {
+      setSaving(false);
     }
   };
-
+  
+  // Handle add entry
+  const handleAddEntry = async () => {
+    if (!entryAmount.trim()) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Amount is required',
+      });
+      return;
+    }
+    
+    const amount = parseFloat(entryAmount);
+    if (isNaN(amount)) {
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: 'Please enter a valid amount',
+      });
+      return;
+    }
+    
+    try {
+      setSaving(true);
+      
+      const response = await addThresholdEntry(thresholdId, {
+        amount
+      });
+      
+      if (response.success) {
+        // Clear input fields
+        setEntryAmount('');
+        
+        // Refresh threshold data
+        fetchThresholdData();
+        
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Entry added successfully',
+        });
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: response.message || 'Failed to add entry',
+        });
+      }
+    } catch (error) {
+      console.error('Error adding entry:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error instanceof Error ? error.message : 'Failed to add entry',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+  
+  // Delete threshold confirmation
   const confirmDelete = () => {
     Alert.alert(
       "Delete Threshold",
@@ -276,212 +280,226 @@ export default function ThresholdDetailScreen() {
         },
         { 
           text: "Delete", 
-          onPress: handleDeleteThreshold,
-          style: "destructive"
+          style: "destructive",
+          onPress: handleDeleteThreshold
         }
       ]
     );
   };
-
-  const handleDeleteThreshold = () => {
-    // Simulate API call to delete threshold
-    setLoading(true);
-    
-    setTimeout(() => {
-      Toast.show({
-        type: 'success',
-        text1: 'Success',
-        text2: 'Threshold deleted successfully',
-        position: 'bottom'
-      });
+  
+  // Handle delete threshold
+  const handleDeleteThreshold = async () => {
+    try {
+      setSaving(true);
       
-      // Navigate back after deletion
-      router.back();
-    }, 1000);
+      // Delete threshold
+      const response = await deleteThreshold(thresholdId);
+      
+      if (response.success) {
+        Toast.show({
+          type: 'success',
+          text1: 'Success',
+          text2: 'Threshold deleted successfully',
+        });
+        
+        // Navigate back
+        router.back();
+      } else {
+        Toast.show({
+          type: 'error',
+          text1: 'Error',
+          text2: response.message || 'Failed to delete threshold',
+        });
+      }
+    } catch (error) {
+      console.error('Error deleting threshold:', error);
+      Toast.show({
+        type: 'error',
+        text1: 'Error',
+        text2: error instanceof Error ? error.message : 'Failed to delete threshold',
+      });
+    } finally {
+      setSaving(false);
+    }
   };
-
+  
+  // Render history entries if available
+  const renderHistoryEntries = () => {
+    if (!threshold?.entries || threshold.entries.length === 0) {
+      return (
+        <View style={styles.emptyHistory}>
+          <Text style={styles.emptyHistoryText}>No history entries</Text>
+        </View>
+      );
+    }
+    
+    return (
+      <FlatList
+        data={threshold.entries}
+        keyExtractor={(item, index) => `history-${index}`}
+        renderItem={({ item, index }) => (
+          <View style={styles.historyItem}>
+            <Text style={styles.historyDate}>{item.created_at}</Text>
+            <Text 
+              style={[
+                styles.historyAmount,
+                { color: item.amount >= 0 ? '#4CAF50' : '#F44336' }
+              ]}
+            >
+              {item.amount >= 0 ? '+' : ''}{item.amount}
+            </Text>
+          </View>
+        )}
+        style={styles.historyList}
+      />
+    );
+  };
+  
+  // If loading, show spinner
+  if (loading) {
+    return (
+      <CustomLayout>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#DF0000" />
+        </View>
+      </CustomLayout>
+    );
+  }
+  
+  // If threshold not found
+  if (!threshold) {
+    return (
+      <CustomLayout>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#DF0000" />
+          <Text style={styles.errorText}>Threshold not found</Text>
+        </View>
+      </CustomLayout>
+    );
+  }
+  
   return (
     <CustomLayout>
-      <SafeAreaView style={styles.container}>
-        <ScrollView style={styles.scrollView}>
-          <View style={styles.headerContainer}>
-            <Text style={styles.pageTitle}>Threshold Detail</Text>
-          </View>
-          
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#DF0000" />
-              <Text style={styles.loadingText}>Loading threshold data...</Text>
-            </View>
-          ) : threshold ? (
-            <View style={styles.thresholdDetailContainer}>
-              {/* Threshold Header Card */}
-              <View style={[
-                styles.thresholdHeaderCard,
-                { backgroundColor: `rgba(${threshold.type === 'youtube' ? '223, 0, 0' : threshold.type === 'music' ? '47, 128, 237' : '39, 174, 96'}, 0.2)` }
-              ]}>
-                <View style={styles.thresholdTitleRow}>
-                  <Text style={styles.thresholdName}>{threshold.name}</Text>
-                  <View style={[
-                    styles.thresholdTypeBadge,
-                    { backgroundColor: `rgba(${threshold.type === 'youtube' ? '223, 0, 0' : threshold.type === 'music' ? '47, 128, 237' : '39, 174, 96'}, 0.3)` }
-                  ]}>
-                    <Text style={[
-                      styles.thresholdTypeText,
-                      { color: getColorByType(threshold.type) }
-                    ]}>
-                      {threshold.type.charAt(0).toUpperCase() + threshold.type.slice(1)}
-                    </Text>
-                  </View>
-                </View>
-                
-                <View style={styles.thresholdAmount}>
-                  <Text style={styles.currentAmount}>${threshold.current.toLocaleString()}</Text>
-                  <Text style={styles.targetAmount}>/ ${threshold.amount.toLocaleString()}</Text>
-                </View>
-                
-                <ProgressBar 
-                  progress={threshold.progress} 
-                  color={getColorByType(threshold.type)} 
-                  height={10}
-                />
-                
-                <Text style={styles.progressText}>
-                  ${threshold.current.toLocaleString()} of ${threshold.amount.toLocaleString()} ({threshold.progress}%)
-                </Text>
-                
-                <Text style={styles.createdDate}>
-                  Created on {threshold.createdAt}
-                </Text>
-              </View>
-              
-              {/* History Chart */}
-              {threshold.history && (
-                <View style={styles.historyCard}>
-                  <Text style={styles.cardTitle}>Revenue History</Text>
-                  
-                  <View style={styles.historyBars}>
-                    {threshold.history.map((item, index) => (
-                      <View key={index} style={styles.historyBarContainer}>
-                        <View style={styles.historyLabelContainer}>
-                          <Text style={styles.historyLabel}>${item.amount}</Text>
-                        </View>
-                        <View 
-                          style={[
-                            styles.historyBar, 
-                            { 
-                              height: `${(item.amount / threshold.amount) * 100}%`,
-                              backgroundColor: getColorByType(threshold.type)
-                            }
-                          ]} 
-                        />
-                        <Text style={styles.historyDate}>
-                          {item.date.split('-')[2]}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                  
-                  <View style={styles.historyLegend}>
-                    <View style={styles.historyLegendItem}>
-                      <View style={[styles.legendDot, { backgroundColor: getColorByType(threshold.type) }]} />
-                      <Text style={styles.legendText}>Revenue</Text>
-                    </View>
-                    <Text style={styles.legendText}>Target: ${threshold.amount}</Text>
-                  </View>
-                </View>
-              )}
-              
-              {/* Edit Threshold Form */}
-              <View style={styles.editCard}>
-                <Text style={styles.cardTitle}>Edit Threshold</Text>
-                
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Threshold Name</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={thresholdName}
-                    onChangeText={setThresholdName}
-                    placeholder="Enter threshold name"
-                    placeholderTextColor="#999"
-                  />
-                </View>
-                
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Threshold Amount ($)</Text>
-                  <TextInput
-                    style={styles.textInput}
-                    value={thresholdAmount}
-                    onChangeText={setThresholdAmount}
-                    placeholder="Enter amount"
-                    placeholderTextColor="#999"
-                    keyboardType="numeric"
-                  />
-                </View>
-                
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Description (Optional)</Text>
-                  <TextInput
-                    style={[styles.textInput, styles.textArea]}
-                    value={thresholdDescription}
-                    onChangeText={setThresholdDescription}
-                    placeholder="Enter description"
-                    placeholderTextColor="#999"
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                  />
-                </View>
-                
-                <View style={styles.switchRow}>
-                  <Text style={styles.switchLabel}>Enable Protection</Text>
-                  <Switch
-                    value={isProtectionEnabled}
-                    onValueChange={setIsProtectionEnabled}
-                    trackColor={{ false: '#555', true: 'rgba(223, 0, 0, 0.3)' }}
-                    thumbColor={isProtectionEnabled ? '#DF0000' : '#ccc'}
-                  />
-                </View>
-                
-                <Text style={styles.switchDescription}>
-                  When enabled, automatic protection features will activate once the threshold is reached.
-                </Text>
-              </View>
-              
-              {/* Action Buttons */}
-              <View style={styles.buttonContainer}>
-                <TouchableOpacity 
-                  style={styles.saveButton}
-                  onPress={handleSaveThreshold}
-                  disabled={savingSettings}
-                >
-                  {savingSettings ? (
-                    <ActivityIndicator size="small" color="#fff" />
-                  ) : (
-                    <>
-                      <Ionicons name="save-outline" size={20} color="#fff" />
-                      <Text style={styles.saveButtonText}>Save Changes</Text>
-                    </>
-                  )}
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.deleteButton}
-                  onPress={confirmDelete}
-                >
-                  <Ionicons name="trash-outline" size={20} color="#fff" />
-                  <Text style={styles.deleteButtonText}>Delete Threshold</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+      <ScrollView style={styles.scrollView}>
+        {/* Header Actions */}
+        <View style={styles.actionButtons}>
+          {editMode ? (
+            <>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.cancelButton]}
+                onPress={() => setEditMode(false)}
+              >
+                <Text style={styles.actionButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.saveButton]}
+                onPress={handleSaveThreshold}
+                disabled={saving}
+              >
+                {saving ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.actionButtonText}>Save</Text>
+                )}
+              </TouchableOpacity>
+            </>
           ) : (
-            <View style={styles.errorContainer}>
-              <Ionicons name="alert-circle-outline" size={60} color="#DF0000" />
-              <Text style={styles.errorText}>Threshold not found</Text>
-            </View>
+            <>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.editButton]}
+                onPress={() => setEditMode(true)}
+              >
+                <Ionicons name="create-outline" size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.actionButton, styles.deleteButton]}
+                onPress={confirmDelete}
+              >
+                <Ionicons name="trash-outline" size={18} color="#fff" />
+                <Text style={styles.actionButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </>
           )}
-        </ScrollView>
-      </SafeAreaView>
+        </View>
+        
+        {/* Threshold Details Section */}
+        <View style={styles.card}>
+          {editMode ? (
+            // Edit Mode
+            <>
+              <Text style={styles.inputLabel}>Threshold Name</Text>
+              <TextInput
+                style={styles.input}
+                value={editData.name}
+                onChangeText={(text) => setEditData({ ...editData, name: text })}
+                placeholder="Enter threshold name"
+                placeholderTextColor="#999"
+              />
+              
+              <Text style={styles.inputLabel}>Amount ($)</Text>
+              <TextInput
+                style={styles.input}
+                value={editData.amount}
+                onChangeText={(text) => setEditData({ ...editData, amount: text })}
+                placeholder="Enter amount"
+                placeholderTextColor="#999"
+                keyboardType="numeric"
+              />
+            </>
+          ) : (
+            // View Mode
+            <>
+              <View style={styles.thresholdHeader}>
+                <Text style={styles.thresholdName}>{threshold.name}</Text>
+              </View>
+              
+              <View style={styles.amountRow}>
+                <Text style={styles.currentAmount}>${threshold.amount}</Text>
+              </View>
+              
+              <Text style={styles.dateText}>Created: {threshold.createdAt}</Text>
+            </>
+          )}
+        </View>
+        
+        {/* Add Entry Section */}
+        {!editMode && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Add Entry</Text>
+            
+            <Text style={styles.inputLabel}>Amount ($)</Text>
+            <TextInput
+              style={styles.input}
+              value={entryAmount}
+              onChangeText={setEntryAmount}
+              placeholder="Enter amount (use - for deduction)"
+              placeholderTextColor="#999"
+              keyboardType="numeric"
+            />
+            
+            <TouchableOpacity
+              style={styles.addEntryButton}
+              onPress={handleAddEntry}
+              disabled={saving}
+            >
+              {saving ? (
+                <ActivityIndicator color="#fff" size="small" />
+              ) : (
+                <Text style={styles.addEntryButtonText}>Add Entry</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
+        
+        {/* History Section */}
+        {!editMode && (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>History</Text>
+            {renderHistoryEntries()}
+          </View>
+        )}
+      </ScrollView>
     </CustomLayout>
   );
 }
@@ -493,10 +511,9 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#222',
   },
@@ -504,256 +521,159 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 18,
     fontWeight: 'bold',
+    marginLeft: 16,
   },
-  content: {
-    flex: 1,
-  },
-  logoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logoutText: {
-    color: '#fff',
-    marginLeft: 5,
+  backButton: {
+    padding: 4,
   },
   scrollView: {
     flex: 1,
-    padding: 20,
-  },
-  headerContainer: {
-    marginBottom: 20,
-  },
-  pageTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#fff',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
-  },
-  loadingText: {
-    color: '#fff',
-    marginTop: 10,
-  },
-  thresholdDetailContainer: {
-    paddingBottom: 20,
-  },
-  thresholdHeaderCard: {
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-  },
-  thresholdTitleRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  thresholdName: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    flex: 1,
-  },
-  thresholdTypeBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-  },
-  thresholdTypeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-  },
-  thresholdAmount: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 15,
-  },
-  currentAmount: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: 'bold',
-  },
-  targetAmount: {
-    color: '#ccc',
-    fontSize: 18,
-    marginLeft: 5,
-  },
-  progressContainer: {
-    width: '100%',
-    backgroundColor: '#333',
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginBottom: 10,
-  },
-  progressFill: {
-    height: '100%',
-  },
-  progressText: {
-    color: '#ccc',
-    fontSize: 14,
-    marginTop: 5,
-  },
-  createdDate: {
-    color: '#999',
-    fontSize: 12,
-    marginTop: 15,
-    textAlign: 'right',
-  },
-  historyCard: {
-    backgroundColor: '#222',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-  },
-  cardTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  historyBars: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 150,
-    marginBottom: 10,
-  },
-  historyBarContainer: {
-    flex: 1,
-    height: '100%',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  historyLabelContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-  },
-  historyLabel: {
-    color: '#ccc',
-    fontSize: 10,
-    marginBottom: 5,
-  },
-  historyBar: {
-    width: 10,
-    borderRadius: 5,
-    marginBottom: 5,
-  },
-  historyDate: {
-    color: '#999',
-    fontSize: 10,
-  },
-  historyLegend: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#333',
-  },
-  historyLegendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  legendDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 5,
-  },
-  legendText: {
-    color: '#ccc',
-    fontSize: 12,
-  },
-  editCard: {
-    backgroundColor: '#222',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
-  },
-  inputGroup: {
-    marginBottom: 15,
-  },
-  inputLabel: {
-    color: '#ccc',
-    fontSize: 14,
-    marginBottom: 8,
-  },
-  textInput: {
-    backgroundColor: '#333',
-    borderRadius: 8,
-    padding: 12,
-    color: '#fff',
-    fontSize: 16,
-  },
-  textArea: {
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  switchLabel: {
-    color: '#ccc',
-    fontSize: 16,
-  },
-  switchDescription: {
-    color: '#999',
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  buttonContainer: {
-    flexDirection: 'column',
-    marginTop: 10,
-  },
-  saveButton: {
-    backgroundColor: '#DF0000',
-    borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 15,
-    marginBottom: 10,
-  },
-  saveButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  deleteButton: {
-    backgroundColor: '#333',
-    borderRadius: 8,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 15,
-  },
-  deleteButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
   },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
+    padding: 20,
   },
   errorText: {
     color: '#fff',
     fontSize: 18,
-    marginTop: 10,
+    marginTop: 16,
+    textAlign: 'center',
+  },
+  card: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    padding: 16,
+    margin: 16,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 4,
+    marginLeft: 8,
+  },
+  editButton: {
+    backgroundColor: '#2196F3',
+  },
+  deleteButton: {
+    backgroundColor: '#F44336',
+  },
+  saveButton: {
+    backgroundColor: '#4CAF50',
+  },
+  cancelButton: {
+    backgroundColor: '#555',
+  },
+  actionButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  thresholdHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  thresholdName: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    flex: 1,
+  },
+  amountRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 12,
+  },
+  currentAmount: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  separator: {
+    fontSize: 18,
+    color: '#888',
+    marginHorizontal: 6,
+  },
+  targetAmount: {
+    fontSize: 18,
+    color: '#888',
+  },
+  dateText: {
+    color: '#888',
+    fontSize: 12,
+    marginTop: 8,
+  },
+  inputLabel: {
+    color: '#ccc',
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  input: {
+    backgroundColor: '#333',
+    color: '#fff',
+    padding: 12,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  cardTitle: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  addEntryButton: {
+    backgroundColor: '#DF0000',
+    paddingVertical: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  addEntryButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  historyList: {
+    marginTop: 8,
+  },
+  historyItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  historyDate: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  historyAmount: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  emptyHistory: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyHistoryText: {
+    color: '#888',
+    fontSize: 14,
   },
 }); 

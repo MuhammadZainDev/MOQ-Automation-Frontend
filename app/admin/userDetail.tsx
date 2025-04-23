@@ -18,6 +18,7 @@ import { adminService } from '../../src/services/adminApi';
 import Toast from 'react-native-toast-message';
 import { useAuth } from '../../src/context/AuthContext';
 import ConfirmationModal from '../../src/components/ConfirmationModal';
+import { getUserThresholdsById, addRevenueToThreshold } from '../../src/services/thresholdApi';
 
 // Utility function to format numbers in a human-readable way (1k, 1.2M, etc)
 const formatNumber = (num: number): string => {
@@ -109,6 +110,12 @@ export default function UserDetailScreen() {
   const [toggleLoading, setToggleLoading] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [showRevenueTypeDropdown, setShowRevenueTypeDropdown] = useState(false);
+  const [showThresholdDropdown, setShowThresholdDropdown] = useState(false);
+  
+  // Add state for thresholds
+  const [thresholds, setThresholds] = useState<any[]>([]);
+  const [selectedThreshold, setSelectedThreshold] = useState<string | null>(null);
+  const [loadingThresholds, setLoadingThresholds] = useState(false);
   
   // Modify notification states - remove message state
   const [notificationModalVisible, setNotificationModalVisible] = useState(false);
@@ -160,6 +167,9 @@ export default function UserDetailScreen() {
           console.log('Analytics not available yet, using default values');
           // Just use the default values we already have
         }
+        
+        // Fetch user thresholds
+        fetchUserThresholds();
       } catch (error) {
         console.error('Error fetching user data:', error);
         Toast.show({
@@ -177,6 +187,24 @@ export default function UserDetailScreen() {
       fetchUserData();
     }
   }, [userId]);
+  
+  // Function to fetch user thresholds
+  const fetchUserThresholds = async () => {
+    try {
+      setLoadingThresholds(true);
+      const response = await getUserThresholdsById(userId);
+      
+      if (response.success) {
+        setThresholds(response.data || []);
+      } else {
+        console.error('Error in threshold response:', response.message);
+      }
+    } catch (error) {
+      console.error('Error fetching user thresholds:', error);
+    } finally {
+      setLoadingThresholds(false);
+    }
+  };
 
   const handleBack = () => {
     router.back();
@@ -195,8 +223,26 @@ export default function UserDetailScreen() {
         revenue_type: revenueType // Add the revenue_type field
       };
       
-      // Update user analytics
-      const response = await adminService.updateUserAnalytics(userId, analyticsData);
+      let response;
+      
+      // Check if threshold is selected
+      if (selectedThreshold && revenue.trim() !== '') {
+        // Update with threshold
+        response = await addRevenueToThreshold(
+          userId, 
+          selectedThreshold, 
+          !isNaN(Number(revenue)) ? Number(revenue) : 0,
+          {
+            views: analyticsData.views,
+            videos: analyticsData.videos,
+            premiumCountryViews: analyticsData.premium_country_views,
+            revenueType: analyticsData.revenue_type
+          }
+        );
+      } else {
+        // Regular update
+        response = await adminService.updateUserAnalytics(userId, analyticsData);
+      }
       
       if (response.success) {
         // Clear the input fields
@@ -210,7 +256,9 @@ export default function UserDetailScreen() {
         Toast.show({
           type: 'success',
           text1: 'Success',
-          text2: 'Analytics data added successfully',
+          text2: selectedThreshold 
+            ? 'Analytics data and threshold updated successfully' 
+            : 'Analytics data added successfully',
           position: 'bottom'
         });
         
@@ -235,6 +283,12 @@ export default function UserDetailScreen() {
           }
         } catch (analyticsError) {
           console.error('Error fetching updated analytics:', analyticsError);
+        }
+        
+        // If threshold was selected, refresh thresholds too
+        if (selectedThreshold) {
+          fetchUserThresholds();
+          setSelectedThreshold(null);
         }
       } else {
         Toast.show({
@@ -489,6 +543,79 @@ export default function UserDetailScreen() {
               </View>
             </View>
           </View>
+          
+          {/* Threshold Selection Dropdown - New Component */}
+          <Text style={styles.label}>Select Threshold (Optional)</Text>
+          <View style={[styles.inputContainer, {zIndex: 200}]}>
+            <Ionicons name="trending-up-outline" size={22} color="#777" style={styles.inputIcon} />
+            <TouchableOpacity 
+              style={styles.dropdownSelectorInline}
+              onPress={() => setShowThresholdDropdown(!showThresholdDropdown)}
+            >
+              <Text style={[styles.input, {paddingVertical: 0, height: 'auto', textAlignVertical: 'center'}]}>
+                {selectedThreshold 
+                  ? thresholds.find(t => t.id === selectedThreshold)?.name || 'Select a threshold'
+                  : 'Select a threshold'}
+              </Text>
+              <Ionicons name="chevron-down" size={18} color="#999" style={{marginRight: 15}} />
+            </TouchableOpacity>
+            
+            {showThresholdDropdown && (
+              <View style={styles.dropdownOptions}>
+                <TouchableOpacity 
+                  style={[styles.dropdownOption, !selectedThreshold && styles.selectedOption]}
+                  onPress={() => {
+                    setSelectedThreshold(null);
+                    setShowThresholdDropdown(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownOptionText, !selectedThreshold && styles.selectedOptionText]}>
+                    No Threshold
+                  </Text>
+                </TouchableOpacity>
+                
+                {loadingThresholds ? (
+                  <View style={styles.dropdownOption}>
+                    <ActivityIndicator size="small" color="#fff" />
+                  </View>
+                ) : thresholds.length === 0 ? (
+                  <View style={styles.dropdownOption}>
+                    <Text style={styles.dropdownOptionText}>No thresholds available</Text>
+                  </View>
+                ) : (
+                  thresholds.map(threshold => (
+                    <TouchableOpacity 
+                      key={threshold.id}
+                      style={[styles.dropdownOption, selectedThreshold === threshold.id && styles.selectedOption]}
+                      onPress={() => {
+                        setSelectedThreshold(threshold.id);
+                        setShowThresholdDropdown(false);
+                      }}
+                    >
+                      <Text 
+                        style={[
+                          styles.dropdownOptionText, 
+                          selectedThreshold === threshold.id && styles.selectedOptionText
+                        ]}
+                      >
+                        {threshold.name} (${threshold.amount})
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </View>
+            )}
+          </View>
+          
+          {/* Note about threshold selection */}
+          {selectedThreshold && (
+            <View style={[styles.noteContainer, {marginTop: -10}]}>
+              <Ionicons name="alert-circle-outline" size={22} color="#DF0000" />
+              <Text style={[styles.noteText, {color: '#DF0000'}]}>
+                Revenue will be added to the selected threshold. Other analytics data will be processed normally.
+              </Text>
+            </View>
+          )}
           
           {/* Revenue and Views in a row */}
           <View style={styles.rowContainer}>
@@ -1001,11 +1128,11 @@ const styles = StyleSheet.create({
     borderColor: '#333',
   },
   dropdownSelectorInline: {
-    flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    height: '100%',
+    flex: 1,
+    height: 50,
   },
   dropdownText: {
     color: '#FFF',
@@ -1013,31 +1140,37 @@ const styles = StyleSheet.create({
   },
   dropdownOptions: {
     position: 'absolute',
-    top: '100%',
+    top: 55,
     left: 0,
     right: 0,
     backgroundColor: '#333',
+    borderRadius: 5,
     borderWidth: 1,
     borderColor: '#444',
-    borderRadius: 8,
-    marginTop: 5,
-    zIndex: 101,
+    paddingVertical: 5,
+    marginHorizontal: 10,
+    zIndex: 100,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    maxHeight: 200,
   },
   dropdownOption: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
     borderBottomWidth: 1,
     borderBottomColor: '#444',
   },
   selectedOption: {
-    backgroundColor: '#444',
+    backgroundColor: '#1e88e5',
   },
   dropdownOptionText: {
-    color: '#CCC',
+    color: '#fff',
     fontSize: 16,
   },
   selectedOptionText: {
-    color: '#FFF',
     fontWeight: 'bold',
   },
   
