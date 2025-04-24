@@ -112,6 +112,13 @@ export default function AdminLayout() {
             title: 'Threshold Details'
           }} 
         />
+        <Stack.Screen 
+          name="addThreshold" 
+          options={{ 
+            headerShown: false,
+            title: 'Add Threshold'
+          }} 
+        />
       </Stack>
     </AdminProtectedRoute>
   );

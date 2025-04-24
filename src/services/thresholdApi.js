@@ -40,7 +40,31 @@ export const getUserThresholds = async () => {
 export const getAllThresholds = async () => {
   try {
     const api = await getAuthorizedApi();
-    const response = await api.get('/thresholds');
+    // Add timestamp to prevent caching
+    const timestamp = new Date().getTime();
+    const response = await api.get(`/thresholds?_t=${timestamp}`);
+    
+    // Log raw response for debugging
+    console.log('Raw thresholds from API:', JSON.stringify(response.data));
+    
+    // Make sure the amount field is properly processed
+    if (response.data && response.data.data) {
+      response.data.data = response.data.data.map(threshold => {
+        // Convert amount to number if it's a string
+        if (threshold.amount && typeof threshold.amount === 'string') {
+          threshold.amount = Number(threshold.amount);
+        }
+        
+        // Ensure current value is a number
+        if (threshold.current && typeof threshold.current === 'string') {
+          threshold.current = Number(threshold.current);
+        }
+        
+        console.log(`Processed threshold ${threshold.id}: amount=${threshold.amount}, current=${threshold.current}`);
+        return threshold;
+      });
+    }
+    
     return response.data;
   } catch (error) {
     console.error('Error fetching all thresholds:', error);
