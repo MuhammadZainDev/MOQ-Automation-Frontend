@@ -8,7 +8,7 @@ const getAuthToken = async () => {
   return token;
 };
 
-// Configure axios with auth token
+// Configure axios with auth token and longer timeout
 const getAuthorizedApi = async () => {
   const token = await getAuthToken();
   return axios.create({
@@ -16,7 +16,8 @@ const getAuthorizedApi = async () => {
     headers: {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`
-    }
+    },
+    timeout: 60000 // 60 seconds timeout for threshold operations
   });
 };
 

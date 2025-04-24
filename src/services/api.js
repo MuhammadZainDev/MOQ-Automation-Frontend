@@ -4,12 +4,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Flag to prevent multiple redirects
 let isRedirecting = false;
 
+// Export API_URL as a constant to use in other service files
+export const API_URL = 'https://moq-automation-backend-production.up.railway.app/api';
+
 // Create axios instance with base URL
 const API = axios.create({
-  baseURL: 'http://192.168.0.104:4000/api',
+  baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  // Add timeout configuration (30 seconds)
+  timeout: 30000,
 });
 
 // Add token to request headers if available
