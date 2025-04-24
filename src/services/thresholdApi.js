@@ -27,7 +27,36 @@ export const getUserThresholds = async () => {
     // Add a timestamp as a query parameter to prevent caching
     const timestamp = new Date().getTime();
     const response = await api.get(`/thresholds/my-thresholds?_t=${timestamp}`);
-    console.log('Thresholds API response:', JSON.stringify(response.data));
+    
+    console.log('Raw user thresholds API response:', JSON.stringify(response.data));
+    
+    // Process the data similar to how we do in getAllThresholds
+    if (response.data && response.data.data) {
+      response.data.data = response.data.data.map(threshold => {
+        // Convert amount to number if it's a string
+        if (threshold.amount && typeof threshold.amount === 'string') {
+          threshold.amount = Number(threshold.amount);
+        }
+        
+        // Ensure current value is a number
+        if (threshold.current && typeof threshold.current === 'string') {
+          threshold.current = Number(threshold.current);
+        }
+        
+        // Process music_revenue and adsense_revenue
+        if (threshold.music_revenue && typeof threshold.music_revenue === 'string') {
+          threshold.music_revenue = Number(threshold.music_revenue);
+        }
+        
+        if (threshold.adsense_revenue && typeof threshold.adsense_revenue === 'string') {
+          threshold.adsense_revenue = Number(threshold.adsense_revenue);
+        }
+        
+        console.log(`Processed user threshold ${threshold.id}: amount=${threshold.amount}, current=${threshold.current}, music_revenue=${threshold.music_revenue}, adsense_revenue=${threshold.adsense_revenue}`);
+        return threshold;
+      });
+    }
+    
     return response.data;
   } catch (error) {
     console.error('Error fetching user thresholds:', error);

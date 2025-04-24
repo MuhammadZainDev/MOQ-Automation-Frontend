@@ -14,9 +14,7 @@ export default function Index() {
         // Check if user has seen welcome screens
         const hasSeenWelcome = await AsyncStorage.getItem('hasSeenWelcome');
         
-        // For development mode - always show welcome screens
-        // Remove the following line in production
-        await AsyncStorage.removeItem('hasSeenWelcome');
+        // Development mode line removed - no longer force showing welcome screens
         
         if (!hasSeenWelcome) {
           // First time user, show welcome screen

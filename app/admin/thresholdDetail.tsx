@@ -46,7 +46,7 @@ type ThresholdDetail = {
 type ThresholdEntry = {
   id: string;
   threshold_id: string;
-  amount: number;
+    amount: number;
   created_at: string;
 };
 
@@ -338,9 +338,9 @@ export default function ThresholdDetailScreen() {
         text2: 'Threshold deleted successfully',
         position: 'bottom'
       });
-        
+      
         // Navigate back
-        router.back();
+      router.back();
       } else {
         Toast.show({
           type: 'error',
@@ -365,10 +365,10 @@ export default function ThresholdDetailScreen() {
   // Render history entries if available
   const renderHistoryEntries = () => {
     if (!threshold?.entries || threshold.entries.length === 0) {
-      return (
+  return (
         <View style={styles.emptyHistory}>
           <Text style={styles.emptyHistoryText}>No history entries</Text>
-        </View>
+          </View>
       );
     }
     
@@ -394,8 +394,8 @@ export default function ThresholdDetailScreen() {
               ]}
             >
               {item.amount >= 0 ? '+$' : '-$'}{Math.abs(item.amount).toFixed(2)}
-            </Text>
-          </View>
+                    </Text>
+                  </View>
         )}
         style={styles.historyList}
       />
@@ -408,7 +408,7 @@ export default function ThresholdDetailScreen() {
       <CustomLayout>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#DF0000" />
-        </View>
+                </View>
       </CustomLayout>
     );
   }
@@ -420,7 +420,7 @@ export default function ThresholdDetailScreen() {
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={64} color="#DF0000" />
           <Text style={styles.errorText}>Threshold not found</Text>
-        </View>
+                </View>
       </CustomLayout>
     );
   }
@@ -434,53 +434,53 @@ export default function ThresholdDetailScreen() {
             <Text style={styles.mainHeading}>Threshold Details</Text>
             <Text style={styles.headingDescription}>
               View and manage details for this threshold. You can update settings or add new entries.
-            </Text>
-          </View>
-          
+                </Text>
+              </View>
+              
           {/* Input Fields Section - Styled like Add Threshold page */}
-          <Text style={styles.inputLabel}>Threshold Name</Text>
+                  <Text style={styles.inputLabel}>Threshold Name</Text>
           <View style={styles.inputContainer}>
             <Ionicons name="bookmark-outline" size={22} color="#777" style={styles.inputIcon} />
-            <TextInput
+                  <TextInput
               style={styles.input}
               value={editData.name}
               onChangeText={(text) => setEditData({ ...editData, name: text })}
-              placeholder="Enter threshold name"
+                    placeholder="Enter threshold name"
               placeholderTextColor="#777"
-            />
-          </View>
-          
+                  />
+                </View>
+                
           <Text style={styles.inputLabel}>Amount ($)</Text>
           <View style={styles.inputContainer}>
             <Ionicons name="cash-outline" size={22} color="#777" style={styles.inputIcon} />
-            <TextInput
+                  <TextInput
               style={styles.input}
               value={editData.amount}
               onChangeText={(text) => setEditData({ ...editData, amount: text })}
-              placeholder="Enter amount"
+                    placeholder="Enter amount"
               placeholderTextColor="#777"
-              keyboardType="numeric"
-            />
-          </View>
-          
-          <TouchableOpacity
+                    keyboardType="numeric"
+                  />
+                </View>
+                
+                <TouchableOpacity 
             style={styles.submitButton}
-            onPress={handleSaveThreshold}
+                  onPress={handleSaveThreshold}
             disabled={saving}
-          >
+                >
             {saving ? (
               <ActivityIndicator color="#fff" size="small" />
-            ) : (
+                  ) : (
               <Text style={styles.submitButtonText}>Update Threshold</Text>
-            )}
-          </TouchableOpacity>
+                  )}
+                </TouchableOpacity>
         </ScrollView>
         
         {/* History Section with fixed height */}
         <View style={styles.historySection}>
           <View style={styles.historySectionHeader}>
             <Text style={styles.historySectionTitle}>History</Text>
-          </View>
+              </View>
           
           {!threshold?.entries || threshold.entries.length === 0 ? (
             <View style={styles.emptyHistory}>
@@ -509,7 +509,7 @@ export default function ThresholdDetailScreen() {
                   >
                     {item.amount >= 0 ? '+$' : '-$'}{Math.abs(item.amount).toFixed(2)}
                   </Text>
-                </View>
+            </View>
               )}
               style={styles.historyList}
             />

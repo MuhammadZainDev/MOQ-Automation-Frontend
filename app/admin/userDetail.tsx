@@ -109,8 +109,8 @@ export default function UserDetailScreen() {
   const [savingAnalytics, setSavingAnalytics] = useState(false);
   const [toggleLoading, setToggleLoading] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-  const [showRevenueTypeDropdown, setShowRevenueTypeDropdown] = useState(false);
-  const [showThresholdDropdown, setShowThresholdDropdown] = useState(false);
+  const [thresholdModalVisible, setThresholdModalVisible] = useState(false);
+  const [revenueTypeModalVisible, setRevenueTypeModalVisible] = useState(false);
   
   // Add state for thresholds
   const [thresholds, setThresholds] = useState<any[]>([]);
@@ -510,7 +510,7 @@ export default function UserDetailScreen() {
             <View style={styles.boxesRow}>
               <View style={styles.analyticsBox}>
                 <Text style={styles.boxLabel}>Revenue (Total)</Text>
-                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.revenue || 0)}</Text>
+                <Text style={styles.boxValue}>${formatNumber(user?.analytics?.revenue || 0)}</Text>
               </View>
               
               <View style={styles.analyticsBox}>
@@ -522,12 +522,12 @@ export default function UserDetailScreen() {
             <View style={styles.boxesRow}>
               <View style={styles.analyticsBox}>
                 <Text style={styles.boxLabel}>Adsense Revenue</Text>
-                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.adsense_revenue || 0)}</Text>
+                <Text style={styles.boxValue}>${formatNumber(user?.analytics?.adsense_revenue || 0)}</Text>
               </View>
               
               <View style={styles.analyticsBox}>
                 <Text style={styles.boxLabel}>Music Revenue</Text>
-                <Text style={styles.boxValue}>{formatNumber(user?.analytics?.music_revenue || 0)}</Text>
+                <Text style={styles.boxValue}>${formatNumber(user?.analytics?.music_revenue || 0)}</Text>
               </View>
             </View>
             
@@ -544,13 +544,13 @@ export default function UserDetailScreen() {
             </View>
           </View>
           
-          {/* Threshold Selection Dropdown - New Component */}
+          {/* Threshold Selection Dropdown - Replace with Modal-based approach */}
           <Text style={styles.label}>Select Threshold (Optional)</Text>
-          <View style={[styles.inputContainer, {zIndex: 200}]}>
+          <View style={styles.inputContainer}>
             <Ionicons name="trending-up-outline" size={22} color="#777" style={styles.inputIcon} />
             <TouchableOpacity 
               style={styles.dropdownSelectorInline}
-              onPress={() => setShowThresholdDropdown(!showThresholdDropdown)}
+              onPress={() => setThresholdModalVisible(true)}
             >
               <Text style={[styles.input, {paddingVertical: 0, height: 'auto', textAlignVertical: 'center'}]}>
                 {selectedThreshold 
@@ -559,52 +559,6 @@ export default function UserDetailScreen() {
               </Text>
               <Ionicons name="chevron-down" size={18} color="#999" style={{marginRight: 15}} />
             </TouchableOpacity>
-            
-            {showThresholdDropdown && (
-              <View style={styles.dropdownOptions}>
-                <TouchableOpacity 
-                  style={[styles.dropdownOption, !selectedThreshold && styles.selectedOption]}
-                  onPress={() => {
-                    setSelectedThreshold(null);
-                    setShowThresholdDropdown(false);
-                  }}
-                >
-                  <Text style={[styles.dropdownOptionText, !selectedThreshold && styles.selectedOptionText]}>
-                    No Threshold
-                  </Text>
-                </TouchableOpacity>
-                
-                {loadingThresholds ? (
-                  <View style={styles.dropdownOption}>
-                    <ActivityIndicator size="small" color="#fff" />
-                  </View>
-                ) : thresholds.length === 0 ? (
-                  <View style={styles.dropdownOption}>
-                    <Text style={styles.dropdownOptionText}>No thresholds available</Text>
-                  </View>
-                ) : (
-                  thresholds.map(threshold => (
-                    <TouchableOpacity 
-                      key={threshold.id}
-                      style={[styles.dropdownOption, selectedThreshold === threshold.id && styles.selectedOption]}
-                      onPress={() => {
-                        setSelectedThreshold(threshold.id);
-                        setShowThresholdDropdown(false);
-                      }}
-                    >
-                      <Text 
-                        style={[
-                          styles.dropdownOptionText, 
-                          selectedThreshold === threshold.id && styles.selectedOptionText
-                        ]}
-                      >
-                        {threshold.name} (${threshold.amount})
-                      </Text>
-                    </TouchableOpacity>
-                  ))
-                )}
-              </View>
-            )}
           </View>
           
           {/* Note about threshold selection */}
@@ -680,45 +634,17 @@ export default function UserDetailScreen() {
           
           {/* Revenue Type - Add it here after Premium Country Views */}
           <Text style={styles.label}>Revenue Type</Text>
-          <View style={[styles.inputContainer, {zIndex: 100}]}>
+          <View style={styles.inputContainer}>
             <Ionicons name="wallet-outline" size={22} color="#777" style={styles.inputIcon} />
             <TouchableOpacity 
               style={styles.dropdownSelectorInline}
-              onPress={() => setShowRevenueTypeDropdown(!showRevenueTypeDropdown)}
+              onPress={() => setRevenueTypeModalVisible(true)}
             >
               <Text style={[styles.input, {paddingVertical: 0, height: 'auto', textAlignVertical: 'center'}]}>
                 {revenueType === 'adsense' ? 'Adsense Revenue' : 'Music Revenue'}
               </Text>
               <Ionicons name="chevron-down" size={18} color="#999" style={{marginRight: 15}} />
             </TouchableOpacity>
-            
-            {showRevenueTypeDropdown && (
-              <View style={styles.dropdownOptions}>
-                <TouchableOpacity 
-                  style={[styles.dropdownOption, revenueType === 'adsense' && styles.selectedOption]}
-                  onPress={() => {
-                    setRevenueType('adsense');
-                    setShowRevenueTypeDropdown(false);
-                  }}
-                >
-                  <Text style={[styles.dropdownOptionText, revenueType === 'adsense' && styles.selectedOptionText]}>
-                    Adsense Revenue
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.dropdownOption, revenueType === 'music' && styles.selectedOption]}
-                  onPress={() => {
-                    setRevenueType('music');
-                    setShowRevenueTypeDropdown(false);
-                  }}
-                >
-                  <Text style={[styles.dropdownOptionText, revenueType === 'music' && styles.selectedOptionText]}>
-                    Music Revenue
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
           
           {/* Simple Toggle Button */}
@@ -828,6 +754,114 @@ export default function UserDetailScreen() {
                       <Text style={styles.sendButtonText}>Send Notification</Text>
                     </>
                   )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Threshold Modal Popup */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={thresholdModalVisible}
+          onRequestClose={() => setThresholdModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Threshold</Text>
+                <TouchableOpacity onPress={() => setThresholdModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              
+              <ScrollView style={styles.dropdownModalList}>
+                <TouchableOpacity 
+                  style={[styles.dropdownModalOption, !selectedThreshold && styles.selectedModalOption]}
+                  onPress={() => {
+                    setSelectedThreshold(null);
+                    setThresholdModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownModalOptionText, !selectedThreshold && styles.selectedModalOptionText]}>
+                    No Threshold
+                  </Text>
+                </TouchableOpacity>
+                
+                {loadingThresholds ? (
+                  <View style={styles.dropdownModalOption}>
+                    <ActivityIndicator size="small" color="#fff" />
+                  </View>
+                ) : thresholds.length === 0 ? (
+                  <View style={styles.dropdownModalOption}>
+                    <Text style={styles.dropdownModalOptionText}>No thresholds available</Text>
+                  </View>
+                ) : (
+                  thresholds.map(threshold => (
+                    <TouchableOpacity 
+                      key={threshold.id}
+                      style={[styles.dropdownModalOption, selectedThreshold === threshold.id && styles.selectedModalOption]}
+                      onPress={() => {
+                        setSelectedThreshold(threshold.id);
+                        setThresholdModalVisible(false);
+                      }}
+                    >
+                      <Text 
+                        style={[
+                          styles.dropdownModalOptionText, 
+                          selectedThreshold === threshold.id && styles.selectedModalOptionText
+                        ]}
+                      >
+                        {threshold.name} (${threshold.amount})
+                      </Text>
+                    </TouchableOpacity>
+                  ))
+                )}
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Revenue Type Modal Popup */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={revenueTypeModalVisible}
+          onRequestClose={() => setRevenueTypeModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Revenue Type</Text>
+                <TouchableOpacity onPress={() => setRevenueTypeModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.dropdownModalList}>
+                <TouchableOpacity 
+                  style={[styles.dropdownModalOption, revenueType === 'adsense' && styles.selectedModalOption]}
+                  onPress={() => {
+                    setRevenueType('adsense');
+                    setRevenueTypeModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownModalOptionText, revenueType === 'adsense' && styles.selectedModalOptionText]}>
+                    Adsense Revenue
+                  </Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.dropdownModalOption, revenueType === 'music' && styles.selectedModalOption]}
+                  onPress={() => {
+                    setRevenueType('music');
+                    setRevenueTypeModalVisible(false);
+                  }}
+                >
+                  <Text style={[styles.dropdownModalOptionText, revenueType === 'music' && styles.selectedModalOptionText]}>
+                    Music Revenue
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1256,5 +1290,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  dropdownModalList: {
+    maxHeight: 300,
+  },
+  dropdownModalOption: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#444',
+  },
+  selectedModalOption: {
+    backgroundColor: '#1e88e5',
+  },
+  dropdownModalOptionText: {
+    color: '#fff',
+    fontSize: 16,
+  },
+  selectedModalOptionText: {
+    fontWeight: 'bold',
   },
 }); 

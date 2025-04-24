@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl, TouchableOpacity, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Toast from 'react-native-toast-message';
@@ -16,6 +16,8 @@ type Threshold = {
   user_id: string;
   current?: number;
   type?: string;
+  music_revenue?: number;
+  adsense_revenue?: number;
   entries?: Array<{
     id: string;
     amount: number;
@@ -59,71 +61,43 @@ const ThresholdCard: React.FC<{
 }> = ({ 
   threshold
 }) => {
-  const { name, amount, current = 0, type = 'youtube', entries = [] } = threshold;
+  const { name, amount, current = 0, type = 'youtube' } = threshold;
   
   // Choose icon based on type
   const getIconByType = (type: string): string => {
-    switch(type) {
-      case 'youtube': return 'videocam-outline';
-      case 'adsense': return 'globe-outline';
-      case 'music': return 'musical-notes-outline';
-      default: return 'cash-outline';
-    }
+    return 'logo-youtube';
   };
 
-  // Calculate revenue breakdown from entries or fallback to estimated split
-  const calculateRevenues = () => {
-    // Try to calculate from entries first
-    let musicRev = 0;
-    let adsenseRev = 0;
-
-    // If entries exist, sum by revenue_type
-    if (entries && entries.length > 0) {
-      console.log(`Threshold ${name}: Has ${entries.length} entries`);
-      
-      entries.forEach(entry => {
-        const entryAmount = Number(entry.amount || 0);
-        const revenueType = String(entry.revenue_type || '').toLowerCase();
-        console.log(`Entry: amount=${entryAmount}, type=${entry.revenue_type || 'undefined'}, lowercase=${revenueType}`);
-        
-        if (revenueType === 'music') {
-          musicRev += entryAmount;
-          console.log(`  Added ${entryAmount} to Music Revenue, now ${musicRev}`);
-        } else {
-          // Default to adsense for any other type
-          adsenseRev += entryAmount;
-          console.log(`  Added ${entryAmount} to Adsense Revenue, now ${adsenseRev}`);
-        }
-      });
-    } else if (current > 0) {
-      // Fallback: estimate 60% music, 40% adsense
-      musicRev = Math.round(current * 0.6);
-      adsenseRev = current - musicRev;
-      console.log(`Threshold ${name}: No entries, estimating: music=${musicRev}, adsense=${adsenseRev}`);
-    }
-
-    return { musicRevenue: musicRev, adsenseRevenue: adsenseRev };
-  };
-
-  const { musicRevenue, adsenseRevenue } = calculateRevenues();
-  console.log(`Final revenues for ${name}: music=${musicRevenue}, adsense=${adsenseRevenue}`);
+  // Get the revenues directly from the threshold object,
+  // exactly like in admin dashboard
+  const musicRevenue = typeof threshold.music_revenue === 'number' ? threshold.music_revenue : 0;
+  const adsenseRevenue = typeof threshold.adsense_revenue === 'number' ? threshold.adsense_revenue : 0;
+  
+  // Calculate total revenue - same as admin dashboard
+  const totalRevenue = musicRevenue + adsenseRevenue;
+  
+  // Use total revenue as the current value - same as admin
+  const effectiveCurrent = totalRevenue;
   
   // Calculate progress with safe check
-  const validCurrent = typeof current === 'number' ? current : 0;
-  console.log(`Threshold card: name=${name}, amount=${amount}, current=${current}, validCurrent=${validCurrent}`);
-  const progress = amount > 0 ? (validCurrent / amount) * 100 : 0;
+  console.log(`Threshold card: name=${name}, amount=${amount}, effectiveCurrent=${effectiveCurrent}`);
+  const progress = amount > 0 ? (effectiveCurrent / amount) * 100 : 0;
   
-  const color = '#DF0000'; // Always use red for progress bar
+  // Check if threshold is completed (100% or more)
+  const isCompleted = progress >= 100;
+  
+  // Use red color for all progress bars
+  const color = '#DF0000'; 
   const iconName = getIconByType(type);
   
   return (
-    <View style={styles.card}>
+    <View style={[styles.card, isCompleted && styles.completedCard]}>
       <View style={styles.cardHeader}>
-        <Ionicons name={iconName as any} size={22} color="#aaa" />
+        <Ionicons name={iconName as any} size={22} color="#DF0000" />
         <Text style={styles.cardTitle}>{name}</Text>
       </View>
       
-      <Text style={styles.amountValue}>${validCurrent}</Text>
+      <Text style={styles.amountValue}>${effectiveCurrent.toFixed(2)}</Text>
       
       <View style={styles.progressBarWrapper}>
         <ProgressBar progress={progress} color={color} height={6} />
@@ -137,17 +111,29 @@ const ThresholdCard: React.FC<{
         <View style={styles.revenueItem}>
           <View style={styles.revenueRow}>
             <View style={[styles.bulletDot, {backgroundColor: '#00D95F'}]} />
-            <Text style={styles.revenueLabel}>Music Revenue: ${musicRevenue}</Text>
+            <Text style={styles.revenueLabel}>Music Revenue: ${musicRevenue.toFixed(2)}</Text>
           </View>
         </View>
         
         <View style={styles.revenueItem}>
           <View style={styles.revenueRow}>
             <View style={[styles.bulletDot, {backgroundColor: '#4285F4'}]} />
-            <Text style={styles.revenueLabel}>Adsense Revenue: ${adsenseRevenue}</Text>
+            <Text style={styles.revenueLabel}>Adsense Revenue: ${adsenseRevenue.toFixed(2)}</Text>
           </View>
         </View>
       </View>
+      
+      {/* Completed overlay - only shown when 100% complete */}
+      {isCompleted && (
+        <View style={styles.completedOverlay}>
+          <View style={styles.completedContent}>
+            <View style={styles.checkmarkCircle}>
+              <Ionicons name="checkmark-sharp" size={24} color="#fff" />
+            </View>
+            <Text style={styles.completedText}>COMPLETED</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -202,7 +188,7 @@ const ThresholdScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['right', 'left']}>
+    <SafeAreaView style={styles.safeArea}>
       <View style={styles.pageHeader}>
         <Text style={styles.pageTitle}>Thresholds</Text>
         <Text style={styles.pageSubtitle}>Your earnings progress thresholds</Text>
@@ -214,7 +200,7 @@ const ThresholdScreen: React.FC = () => {
         </View>
       ) : (
         <ScrollView 
-          style={styles.scrollView}
+          style={styles.container}
           contentContainerStyle={styles.contentContainer}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={["#DF0000"]} />
@@ -231,7 +217,7 @@ const ThresholdScreen: React.FC = () => {
               
               <View style={styles.explanationCard}>
                 <Text style={styles.explanationText}>
-                  Set thresholds to protect your earnings and views. When enabled, your account will be automatically protected when these thresholds are reached.
+                  A threshold holder is a revenue target. Once the target is met, earnings stop, and the cycle resets for the next one.
                 </Text>
               </View>
             </>
@@ -251,29 +237,30 @@ const ThresholdScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
   container: {
     flex: 1,
     backgroundColor: '#000',
   },
   pageHeader: {
-    paddingHorizontal: 16,
-    paddingTop: 30,
-    paddingBottom: 10,
-    borderBottomWidth: 0,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    marginTop: Platform.OS === 'ios' ? 10 : 30,
   },
   pageTitle: {
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 5,
   },
   pageSubtitle: {
-    fontSize: 14,
-    color: '#888',
+    fontSize: 16,
+    color: '#999',
     marginBottom: 10,
-  },
-  scrollView: {
-    flex: 1,
   },
   contentContainer: {
     padding: 16,
@@ -390,6 +377,41 @@ const styles = StyleSheet.create({
     color: '#888',
     textAlign: 'center',
     marginTop: 8,
+  },
+  completedCard: {
+    borderColor: '#DF0000',
+    borderWidth: 2,
+  },
+  completedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.8)', // Darker overlay
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 12,
+    zIndex: 10,
+  },
+  completedContent: {
+    alignItems: 'center',
+  },
+  checkmarkCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#DF0000',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  completedText: {
+    color: '#fff',
+    fontSize: 24,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+    textAlign: 'center',
   },
 });
 

@@ -357,8 +357,8 @@ export default function ThresholdsScreen() {
             <Text style={styles.revenueText}>Adsense Revenue: ${adsenseRevenue.toFixed(2)}</Text>
           </View>
         )}
-      </View>
-      
+          </View>
+          
       {/* Completed overlay - only shown when 100% complete */}
       {isCompleted && (
         <View style={styles.completedOverlay}>
@@ -371,7 +371,7 @@ export default function ThresholdsScreen() {
         </View>
       )}
     </TouchableOpacity>
-    );
+  );
   };
 
   return (

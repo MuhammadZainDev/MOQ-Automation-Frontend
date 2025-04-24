@@ -114,11 +114,14 @@ export default function StatsScreen() {
           const createdAt = entry.created_at ? new Date(entry.created_at) : new Date();
           const revenueType = entry.revenue_type || 'adsense'; // Default to 'adsense' if not specified
           
+          // Check if this revenue came from a threshold
+          const isFromThreshold = entry.from_threshold || entry.threshold_id;
+          
           return {
             id: index,
             date: createdAt.toLocaleDateString(),
             revenue: entryRevenue,
-            status: 'Recorded',
+            status: isFromThreshold ? 'Threshold' : 'Recorded',
             source: revenueType === 'music' ? 'Music Revenue' : 'Adsense Revenue',
             revenue_type: revenueType,
             timestamp: createdAt
@@ -173,7 +176,7 @@ export default function StatsScreen() {
               />
               <Text style={styles.headerTitle}>Your Revenue</Text>
             </View>
-            <Text style={styles.totalStats}>{"$" + " " + formatNumber(statsData.total)}</Text>
+            <Text style={styles.totalStats}>${formatNumber(statsData.total)}</Text>
             <Text style={styles.statsPeriod}>Total revenue in this year</Text>
           </View>
         </SafeAreaView>
@@ -195,12 +198,12 @@ export default function StatsScreen() {
                     </View>
                     <View style={styles.historyDetails}>
                       <Text style={styles.historySource}>{item.source}</Text>
-                      <Text style={styles.statusRecorded}>
-                        Recorded
+                      <Text style={item.status === 'Threshold' ? styles.statusThreshold : styles.statusRecorded}>
+                        {item.status}
                       </Text>
                     </View>
                   </View>
-                  <Text style={styles.historyStats}>{"$" + formatNumber(item.revenue)}</Text>
+                  <Text style={styles.historyStats}>${formatNumber(item.revenue)}</Text>
                 </View>
               ))}
               
@@ -360,6 +363,10 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   statusRecorded: {
+    fontSize: 12,
+    color: '#4CD964',
+  },
+  statusThreshold: {
     fontSize: 12,
     color: '#4CD964',
   },

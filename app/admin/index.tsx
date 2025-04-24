@@ -12,6 +12,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AdminLayout from '../../src/components/AdminLayout';
 import { adminService } from '../../src/services/adminApi';
 import Toast from 'react-native-toast-message';
+import { getAllThresholds } from '../../src/services/thresholdApi';
 
 // Initial empty stats
 const initialStats = {
@@ -42,8 +43,9 @@ export default function AdminDashboard() {
       const pendingResponse = await adminService.getPendingApprovals();
       const pendingApprovals = pendingResponse.count || 0;
       
-      // Simulate threshold data for now (would be fetched from API)
-      const totalThresholds = 5; // Example count of users with thresholds set
+      // Get actual threshold count from API
+      const thresholdsResponse = await getAllThresholds();
+      const totalThresholds = thresholdsResponse?.data?.length || 0;
       
       setStats({
         totalUsers,
@@ -124,28 +126,34 @@ export default function AdminDashboard() {
           {/* Simple Stat Boxes */}
           <View style={styles.statsContainer}>
             <TouchableOpacity 
-              style={styles.statBox}
+              style={[styles.statBox, styles.usersBox]}
               onPress={() => router.push('/admin/users')}
             >
-              <Ionicons name="people-outline" size={30} color="#3498db" />
+              <View style={styles.usersIconContainer}>
+                <Ionicons name="people" size={30} color="#3498db" />
+              </View>
               <Text style={styles.statValue}>{stats.totalUsers}</Text>
               <Text style={styles.statLabel}>Total Users</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
-              style={styles.statBox}
+              style={[styles.statBox, styles.approvalsBox]}
               onPress={goToApprovals}
             >
-              <Ionicons name="time-outline" size={30} color="#DF0000" />
+              <View style={styles.approvalsIconContainer}>
+                <Ionicons name="time" size={30} color="#DF0000" />
+              </View>
               <Text style={styles.statValue}>{stats.pendingApprovals}</Text>
               <Text style={styles.statLabel}>Pending Approvals</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
-              style={styles.statBox}
+              style={[styles.statBox, styles.thresholdBox]}
               onPress={() => router.push('/admin/thresholds')}
             >
-              <Ionicons name="shield-outline" size={30} color="#27AE60" />
+              <View style={styles.iconContainer}>
+                <Ionicons name="trending-up" size={30} color="#27AE60" />
+              </View>
               <Text style={styles.statValue}>{stats.totalThresholds}</Text>
               <Text style={styles.statLabel}>Thresholds</Text>
             </TouchableOpacity>
@@ -199,19 +207,32 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 15,
     alignItems: 'center',
-    height: 140,
     justifyContent: 'center',
+    minHeight: 160,
+  },
+  thresholdBox: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#27AE60',
+  },
+  iconContainer: {
+    backgroundColor: 'rgba(39, 174, 96, 0.1)',
+    borderRadius: 40,
+    width: 56,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 32,
     fontWeight: 'bold',
     color: '#fff',
-    marginTop: 10,
+    marginVertical: 8,
   },
   statLabel: {
-    fontSize: 14,
     color: '#aaa',
-    marginTop: 5,
+    fontSize: 14,
+    textAlign: 'center',
   },
   lastLoginContainer: {
     flexDirection: 'row',
@@ -225,5 +246,31 @@ const styles = StyleSheet.create({
     color: '#aaa',
     marginLeft: 10,
     fontSize: 14,
+  },
+  usersBox: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#3498db',
+  },
+  approvalsBox: {
+    borderLeftWidth: 3,
+    borderLeftColor: '#DF0000',
+  },
+  usersIconContainer: {
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    borderRadius: 40,
+    width: 56,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  approvalsIconContainer: {
+    backgroundColor: 'rgba(223, 0, 0, 0.1)',
+    borderRadius: 40,
+    width: 56,
+    height: 56,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
   },
 }); 

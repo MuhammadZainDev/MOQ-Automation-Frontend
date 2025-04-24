@@ -49,10 +49,7 @@ export default function WelcomeScreen1() {
 
   const handleNext = async () => {
     try {
-      // For development mode - always show welcome screens 
-      // In production, you would set 'hasSeenWelcome' to 'true'
-      // await AsyncStorage.setItem('hasSeenWelcome', 'true');
-      
+      // Just navigate to next screen without setting hasSeenWelcome yet
       router.push('/welcome2');
     } catch (error) {
       console.error('Error navigating to next screen:', error);

@@ -55,8 +55,9 @@ export default function WelcomeScreen2() {
 
   const handleContinue = async () => {
     try {
-      // In production, this is where you would set the hasSeenWelcome flag
-      // await AsyncStorage.setItem('hasSeenWelcome', 'true');
+      // Set the hasSeenWelcome flag at the end of the welcome flow
+      // This ensures it's only shown on first app install
+      await AsyncStorage.setItem('hasSeenWelcome', 'true');
       
       // Navigate to login
       router.push('/login');

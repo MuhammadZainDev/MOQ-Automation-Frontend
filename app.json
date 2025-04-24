@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "MOQ-Automation-Frontend",
+    "name": "MOQ Automation",
     "slug": "MOQ-Automation-Frontend",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,13 +9,19 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.moqautomation.app",
+      "buildNumber": "1.0.0",
+      "displayName": "MOQ Automation"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.moqautomation.app",
+      "versionCode": 1,
+      "displayName": "MOQ Automation"
     },
     "web": {
       "bundler": "metro",

@@ -826,9 +826,9 @@ export default function HomeScreen() {
                 {isLoadingAnalytics ? (
                   <ActivityIndicator size="small" color="#DF0000" />
                 ) : (
-                  formatNumber(dailyAnalyticsData.revenue)
+                  `$${formatNumber(dailyAnalyticsData.revenue)}`
                 )}
-          </Text>
+              </Text>
               <View style={styles.analyticsFooter}>
                 <Text style={styles.analyticsTrend}>Today</Text>
               </View>
@@ -895,64 +895,8 @@ export default function HomeScreen() {
               <View style={styles.analyticsHeaderTitleContainer}>
                 <Text style={styles.analyticsHeaderTitle}>Total Revenue</Text>
                 
-                {/* Standard dropdown select */}
-                <View style={styles.selectContainer}>
-                  <TouchableOpacity 
-                    style={styles.standardDropdown}
-                    onPress={() => setShowOptions(!showOptions)}
-                  >
-                    <Text style={styles.dropdownValue}>
-                      {selectedTimeframe === '280' ? '28 Days' : 
-                       selectedTimeframe === '90D' ? '90 Days' : 
-                       selectedTimeframe === 'Apr' ? 'April' : 'March'}
-                    </Text>
-                    <Ionicons name="chevron-down" size={14} color="#999" />
-                  </TouchableOpacity>
-                  
-                  {showOptions && (
-                    <View style={styles.optionsContainer}>
-                      <TouchableOpacity 
-                        style={[styles.option, selectedTimeframe === '280' && styles.selectedOption]}
-                        onPress={() => {
-                          setSelectedTimeframe('280');
-                          setShowOptions(false);
-                        }}
-                      >
-                        <Text style={[styles.optionText, selectedTimeframe === '280' && styles.selectedOptionText]}>28 Days</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={[styles.option, selectedTimeframe === '90D' && styles.selectedOption]}
-                        onPress={() => {
-                          setSelectedTimeframe('90D');
-                          setShowOptions(false);
-                        }}
-                      >
-                        <Text style={[styles.optionText, selectedTimeframe === '90D' && styles.selectedOptionText]}>90 Days</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={[styles.option, selectedTimeframe === 'Apr' && styles.selectedOption]}
-                        onPress={() => {
-                          setSelectedTimeframe('Apr');
-                          setShowOptions(false);
-                        }}
-                      >
-                        <Text style={[styles.optionText, selectedTimeframe === 'Apr' && styles.selectedOptionText]}>April</Text>
-                      </TouchableOpacity>
-                      
-                      <TouchableOpacity 
-                        style={[styles.option, selectedTimeframe === 'Mar' && styles.selectedOption]}
-                        onPress={() => {
-                          setSelectedTimeframe('Mar');
-                          setShowOptions(false);
-                        }}
-                      >
-                        <Text style={[styles.optionText, selectedTimeframe === 'Mar' && styles.selectedOptionText]}>March</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
+                {/* Year indicator */}
+                <Text style={styles.yearIndicator}>2025</Text>
               </View>
             </View>
             
@@ -969,10 +913,10 @@ export default function HomeScreen() {
                     {/* Revenue Card */}
                     <View style={styles.detailedCard}>
                       <Text style={styles.cardTitle}>Total Revenue</Text>
-                      <Text style={styles.cardValue}>{formatNumber(analyticsData.revenue || 0)}</Text>
+                      <Text style={styles.cardValue}>${formatNumber(analyticsData.revenue || 0)}</Text>
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
-                        <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.revenue || 0) / 28))} / day</Text>
+                        <Text style={styles.averageValue}>${formatNumber(Math.round((analyticsData.revenue || 0) / 28))} / day</Text>
                       </View>
                     </View>
                     
@@ -983,36 +927,6 @@ export default function HomeScreen() {
                       <View style={styles.averageContainer}>
                         <Text style={styles.averageLabel}>Average</Text>
                         <Text style={styles.averageValue}>{formatNumber(Math.round((analyticsData.videos || 0) / 28))} / day</Text>
-            </View>
-          </View>
-        </View>
-        
-                  <View style={styles.detailedCardsRow}>
-                    {/* Adsense Revenue Card */}
-                    <View style={styles.detailedCard}>
-                      <Text style={styles.cardTitle}>Adsense Revenue</Text>
-                      <Text style={styles.cardValue}>{formatNumber(analyticsData.adsense_revenue || 0)}</Text>
-                      <View style={styles.averageContainer}>
-                        <Text style={styles.averageLabel}>% of Total</Text>
-                        <Text style={styles.averageValue}>
-                          {analyticsData.revenue ? 
-                            Math.round(((analyticsData.adsense_revenue || 0) / analyticsData.revenue) * 100) + '%'
-                            : '0%'}
-                        </Text>
-                      </View>
-                    </View>
-                    
-                    {/* Music Revenue Card */}
-                    <View style={styles.detailedCard}>
-                      <Text style={styles.cardTitle}>Music Revenue</Text>
-                      <Text style={styles.cardValue}>{formatNumber(analyticsData.music_revenue || 0)}</Text>
-                      <View style={styles.averageContainer}>
-                        <Text style={styles.averageLabel}>% of Total</Text>
-                        <Text style={styles.averageValue}>
-                          {analyticsData.revenue ? 
-                            Math.round(((analyticsData.music_revenue || 0) / analyticsData.revenue) * 100) + '%'
-                            : '0%'}
-                        </Text>
                       </View>
                     </View>
                   </View>
@@ -1749,5 +1663,11 @@ const styles = StyleSheet.create({
   redText: {
     color: '#DF0000',
     fontWeight: 'bold',
+  },
+  yearIndicator: {
+    color: '#DF0000',
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginLeft: 'auto',
   },
 });
