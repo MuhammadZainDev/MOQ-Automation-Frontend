@@ -12,7 +12,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.moqautomation.app",
       "buildNumber": "1.0.0",
-      "displayName": "MOQ Automation"
+      "displayName": "MOQ Automation",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -42,6 +45,14 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "9fb479bb-43e6-4a47-9e81-1b01ca2d2bb2"
+      }
     }
   }
 }
