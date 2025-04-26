@@ -69,8 +69,12 @@ const formatNumber = (num: number): string => {
     return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
   }
   
-  // Return the number as is if less than 1000
-  return num.toString();
+  // For smaller numbers, show 2 decimal places for revenue display
+  if (Number.isInteger(num)) {
+    return num.toString();
+  } else {
+    return num.toFixed(2);
+  }
 };
 
 // Update the generatePDF function
@@ -1287,28 +1291,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 20,
+    padding: 16,
+    paddingTop: Platform.OS === 'android' ? 25 : 16,
+    backgroundColor: '#111',
   },
   channelInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   logoContainer: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    borderWidth: 2,
-    borderColor: '#FFA000',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+    marginRight: 10,
+    marginTop: Platform.OS === 'android' ? 10 : 0,
   },
   logo: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: '100%',
+    height: '100%',
   },
   channelTextInfo: {
     marginLeft: 16,

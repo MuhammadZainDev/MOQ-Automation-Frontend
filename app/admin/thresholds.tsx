@@ -345,19 +345,15 @@ export default function ThresholdsScreen() {
         
       {/* Revenue breakdown section */}
       <View style={styles.revenueBreakdown}>
-        {musicRevenue > 0 && (
-          <View style={styles.revenueItem}>
-            <View style={[styles.revenueDot, { backgroundColor: TYPE_COLORS.music }]} />
-            <Text style={styles.revenueText}>Music Revenue: ${musicRevenue.toFixed(2)}</Text>
-          </View>
-        )}
-        {adsenseRevenue > 0 && (
-          <View style={styles.revenueItem}>
-            <View style={[styles.revenueDot, { backgroundColor: TYPE_COLORS.adsense }]} />
-            <Text style={styles.revenueText}>Adsense Revenue: ${adsenseRevenue.toFixed(2)}</Text>
-          </View>
-        )}
-          </View>
+        <View style={styles.revenueItem}>
+          <View style={[styles.revenueDot, { backgroundColor: TYPE_COLORS.music }]} />
+          <Text style={styles.revenueText}>Music Revenue: ${musicRevenue.toFixed(2)}</Text>
+        </View>
+        <View style={styles.revenueItem}>
+          <View style={[styles.revenueDot, { backgroundColor: TYPE_COLORS.adsense }]} />
+          <Text style={styles.revenueText}>Adsense Revenue: ${adsenseRevenue.toFixed(2)}</Text>
+        </View>
+      </View>
           
       {/* Completed overlay - only shown when 100% complete */}
       {isCompleted && (
@@ -538,7 +534,7 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 6,
-    backgroundColor: THEME_COLOR,
+    backgroundColor: '#333',
     borderRadius: 3,
     overflow: 'hidden',
     marginBottom: 8,

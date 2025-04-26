@@ -205,10 +205,50 @@ export const adminService = {
   // Update user analytics
   updateUserAnalytics: async (userId, analyticsData) => {
     try {
-      console.log('Updating analytics for user:', userId, analyticsData);
+      console.log('\n=== FRONTEND API SERVICE ===');
+      console.log('Original analytics data:', JSON.stringify(analyticsData));
+      console.log(`Original revenue value: '${analyticsData.revenue}' (type: ${typeof analyticsData.revenue})`);
+      
+      // Make a copy of the analytics data to avoid modifying the original
+      const formattedData = { ...analyticsData };
+      
+      // Ensure revenue has proper decimal format if it exists
+      if (formattedData.revenue !== undefined && formattedData.revenue !== '') {
+        let revenueStr = typeof formattedData.revenue === 'string' 
+          ? formattedData.revenue 
+          : String(formattedData.revenue);
+        
+        console.log(`After initial conversion: '${revenueStr}'`);
+        
+        // Format to ensure exactly 2 decimal places
+        if (!revenueStr.includes('.')) {
+          // If no decimal point, add .00
+          console.log(`No decimal point, adding .00`);
+          revenueStr = revenueStr + '.00';
+        } else {
+          // If has decimal point, ensure it has exactly 2 digits after
+          const parts = revenueStr.split('.');
+          console.log(`Split parts:`, parts);
+          
+          if (parts[1].length === 1) {
+            // If only one digit after decimal, add a zero
+            console.log(`Only one decimal digit, adding 0`);
+            revenueStr = revenueStr + '0';
+          } else if (parts[1].length > 2) {
+            // If more than 2 digits after decimal, truncate to 2
+            console.log(`More than 2 decimal digits, truncating`);
+            revenueStr = parts[0] + '.' + parts[1].substring(0, 2);
+          }
+        }
+        
+        formattedData.revenue = revenueStr;
+        console.log(`Final formatted revenue value: '${formattedData.revenue}'`);
+      }
+      
+      console.log('Formatted data being sent to backend:', JSON.stringify(formattedData));
       
       // Change to auth endpoint to match existing pattern
-      const response = await API.patch(`/auth/users/${userId}/analytics`, analyticsData);
+      const response = await API.patch(`/auth/users/${userId}/analytics`, formattedData);
       return response.data;
     } catch (error) {
       console.error('Error updating user analytics:', error);

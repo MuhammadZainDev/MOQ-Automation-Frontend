@@ -34,8 +34,25 @@ const formatNumber = (num: number): string => {
     return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
   }
   
-  // Return the number as is if less than 1000
-  return num.toString();
+  // For smaller numbers, preserve exactly what the user sees
+  // Convert to string to check for decimal places
+  const numStr = num.toString();
+  
+  // If it's an integer (no decimal point), return as is
+  if (!numStr.includes('.')) {
+    return numStr;
+  }
+  
+  // If it has decimal places, show them exactly as they are
+  const [intPart, decimalPart] = numStr.split('.');
+  
+  // Don't show ".0" but do show all other decimals
+  if (decimalPart === '0') {
+    return intPart;
+  }
+  
+  // Return with exact decimal places as in the original
+  return numStr;
 };
 
 type UserDetail = {
@@ -214,24 +231,53 @@ export default function UserDetailScreen() {
     try {
       setSavingAnalytics(true);
       
-      // Validate inputs - ensure they are numbers
+      console.log('\n=== USER DETAIL SCREEN: handleSave ===');
+      console.log(`Raw revenue input: '${revenue}' (type: ${typeof revenue})`);
+      
+      // First, make sure we preserve the exact string format
+      const revenueStr = revenue.trim();
+      console.log(`After trim: '${revenueStr}'`);
+      
+      // Ensure the decimal part is preserved
+      let formattedRevenue = revenueStr;
+      
+      // If there's no decimal point but we need one, add .00
+      if (revenueStr !== '' && !revenueStr.includes('.')) {
+        console.log(`No decimal point, adding .00`);
+        formattedRevenue = revenueStr + '.00';
+      } 
+      // If there's a decimal point but only one digit after it, add a trailing 0
+      else if (revenueStr.includes('.') && revenueStr.split('.')[1].length === 1) {
+        console.log(`One decimal digit, adding trailing 0`);
+        formattedRevenue = revenueStr + '0';
+      }
+      
+      console.log(`After decimal formatting: '${formattedRevenue}'`);
+      
+      // Validate inputs - ensure they are numbers but preserve the exact string for revenue
       const analyticsData = {
-        revenue: !isNaN(Number(revenue)) ? Number(revenue) : 0,
+        // Pass revenue as the exact string to preserve decimal format
+        revenue: formattedRevenue !== '' ? formattedRevenue : '0.00',
         views: !isNaN(Number(views)) ? Number(views) : 0,
         videos: !isNaN(Number(videos)) ? Number(videos) : 0,
         premium_country_views: !isNaN(Number(premiumCountryViews)) ? Number(premiumCountryViews) : 0,
         revenue_type: revenueType // Add the revenue_type field
       };
       
+      // Log the exact value we're sending to verify it's correct
+      console.log(`Revenue value in analyticsData: '${analyticsData.revenue}' (type: ${typeof analyticsData.revenue})`);
+      console.log(`Complete analyticsData:`, JSON.stringify(analyticsData));
+      
       let response;
       
       // Check if threshold is selected
       if (selectedThreshold && revenue.trim() !== '') {
-        // Update with threshold
+        console.log(`Using threshold ${selectedThreshold}, sending to addRevenueToThreshold`);
+        // Update with threshold - use the same string value
         response = await addRevenueToThreshold(
           userId, 
           selectedThreshold, 
-          !isNaN(Number(revenue)) ? Number(revenue) : 0,
+          formattedRevenue,
           {
             views: analyticsData.views,
             videos: analyticsData.videos,
@@ -240,9 +286,12 @@ export default function UserDetailScreen() {
           }
         );
       } else {
+        console.log(`No threshold selected, sending to updateUserAnalytics`);
         // Regular update
         response = await adminService.updateUserAnalytics(userId, analyticsData);
       }
+      
+      console.log(`API response:`, response);
       
       if (response.success) {
         // Clear the input fields
@@ -582,8 +631,22 @@ export default function UserDetailScreen() {
                   placeholder="Enter new revenue to add" 
                   placeholderTextColor="#777"
                   value={revenue}
-                  onChangeText={setRevenue}
-                  keyboardType="numeric"
+                  onChangeText={(text) => {
+                    // Make sure we accept decimal values correctly
+                    // Allow only digits and at most one decimal point
+                    const formattedText = text.replace(/[^0-9.]/g, '');
+                    
+                    // Prevent multiple decimal points
+                    const decimalPoints = formattedText.match(/\./g);
+                    if (decimalPoints && decimalPoints.length > 1) {
+                      // If there are multiple decimal points, keep only the first one
+                      const parts = formattedText.split('.');
+                      setRevenue(parts[0] + '.' + parts.slice(1).join(''));
+                    } else {
+                      setRevenue(formattedText);
+                    }
+                  }}
+                  keyboardType="decimal-pad"
                 />
               </View>
             </View>
@@ -760,6 +823,61 @@ export default function UserDetailScreen() {
           </View>
         </Modal>
 
+        {/* Revenue Type Modal */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={revenueTypeModalVisible}
+          onRequestClose={() => setRevenueTypeModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Select Revenue Type</Text>
+                <TouchableOpacity onPress={() => setRevenueTypeModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.modalBody}>
+                <TouchableOpacity 
+                  style={styles.userItem}
+                  onPress={() => {
+                    setRevenueType('adsense');
+                    setRevenueTypeModalVisible(false);
+                  }}
+                >
+                  <View style={styles.userItemContent}>
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName}>Adsense Revenue</Text>
+                    </View>
+                    {revenueType === 'adsense' && (
+                      <Ionicons name="checkmark-circle" size={24} color="#DF0000" style={styles.checkIcon} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={styles.userItem}
+                  onPress={() => {
+                    setRevenueType('music');
+                    setRevenueTypeModalVisible(false);
+                  }}
+                >
+                  <View style={styles.userItemContent}>
+                    <View style={styles.userInfo}>
+                      <Text style={styles.userName}>Music Revenue</Text>
+                    </View>
+                    {revenueType === 'music' && (
+                      <Ionicons name="checkmark-circle" size={24} color="#DF0000" style={styles.checkIcon} />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         {/* Threshold Modal Popup */}
         <Modal
           animationType="slide"
@@ -776,93 +894,59 @@ export default function UserDetailScreen() {
                 </TouchableOpacity>
               </View>
               
-              <ScrollView style={styles.dropdownModalList}>
-                <TouchableOpacity 
-                  style={[styles.dropdownModalOption, !selectedThreshold && styles.selectedModalOption]}
-                  onPress={() => {
-                    setSelectedThreshold(null);
-                    setThresholdModalVisible(false);
-                  }}
-                >
-                  <Text style={[styles.dropdownModalOptionText, !selectedThreshold && styles.selectedModalOptionText]}>
-                    No Threshold
-                  </Text>
-                </TouchableOpacity>
-                
+              <View style={styles.modalBody}>
                 {loadingThresholds ? (
-                  <View style={styles.dropdownModalOption}>
-                    <ActivityIndicator size="small" color="#fff" />
-                  </View>
-                ) : thresholds.length === 0 ? (
-                  <View style={styles.dropdownModalOption}>
-                    <Text style={styles.dropdownModalOptionText}>No thresholds available</Text>
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color="#DF0000" />
+                    <Text style={styles.loadingText}>Loading thresholds...</Text>
                   </View>
                 ) : (
-                  thresholds.map(threshold => (
+                  <ScrollView style={styles.userList}>
                     <TouchableOpacity 
-                      key={threshold.id}
-                      style={[styles.dropdownModalOption, selectedThreshold === threshold.id && styles.selectedModalOption]}
+                      style={styles.userItem}
                       onPress={() => {
-                        setSelectedThreshold(threshold.id);
+                        setSelectedThreshold(null);
                         setThresholdModalVisible(false);
                       }}
                     >
-                      <Text 
-                        style={[
-                          styles.dropdownModalOptionText, 
-                          selectedThreshold === threshold.id && styles.selectedModalOptionText
-                        ]}
-                      >
-                        {threshold.name} (${threshold.amount})
-                      </Text>
+                      <View style={styles.userItemContent}>
+                        <View style={styles.userInfo}>
+                          <Text style={styles.userName}>No Threshold</Text>
+                        </View>
+                        {selectedThreshold === null && (
+                          <Ionicons name="checkmark-circle" size={24} color="#DF0000" style={styles.checkIcon} />
+                        )}
+                      </View>
                     </TouchableOpacity>
-                  ))
+                    
+                    {thresholds.length === 0 ? (
+                      <View style={styles.noUsersContainer}>
+                        <Text style={styles.noUsersText}>No thresholds available</Text>
+                      </View>
+                    ) : (
+                      thresholds.map(threshold => (
+                        <TouchableOpacity 
+                          key={threshold.id}
+                          style={styles.userItem}
+                          onPress={() => {
+                            setSelectedThreshold(threshold.id);
+                            setThresholdModalVisible(false);
+                          }}
+                        >
+                          <View style={styles.userItemContent}>
+                            <View style={styles.userInfo}>
+                              <Text style={styles.userName}>{threshold.name}</Text>
+                              <Text style={styles.userEmail}>${threshold.amount}</Text>
+                            </View>
+                            {selectedThreshold === threshold.id && (
+                              <Ionicons name="checkmark-circle" size={24} color="#DF0000" style={styles.checkIcon} />
+                            )}
+                          </View>
+                        </TouchableOpacity>
+                      ))
+                    )}
+                  </ScrollView>
                 )}
-              </ScrollView>
-            </View>
-          </View>
-        </Modal>
-
-        {/* Revenue Type Modal Popup */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={revenueTypeModalVisible}
-          onRequestClose={() => setRevenueTypeModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Select Revenue Type</Text>
-                <TouchableOpacity onPress={() => setRevenueTypeModalVisible(false)}>
-                  <Ionicons name="close" size={24} color="#fff" />
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.dropdownModalList}>
-                <TouchableOpacity 
-                  style={[styles.dropdownModalOption, revenueType === 'adsense' && styles.selectedModalOption]}
-                  onPress={() => {
-                    setRevenueType('adsense');
-                    setRevenueTypeModalVisible(false);
-                  }}
-                >
-                  <Text style={[styles.dropdownModalOptionText, revenueType === 'adsense' && styles.selectedModalOptionText]}>
-                    Adsense Revenue
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={[styles.dropdownModalOption, revenueType === 'music' && styles.selectedModalOption]}
-                  onPress={() => {
-                    setRevenueType('music');
-                    setRevenueTypeModalVisible(false);
-                  }}
-                >
-                  <Text style={[styles.dropdownModalOptionText, revenueType === 'music' && styles.selectedModalOptionText]}>
-                    Music Revenue
-                  </Text>
-                </TouchableOpacity>
               </View>
             </View>
           </View>
@@ -1230,22 +1314,25 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContainer: {
     width: '90%',
-    backgroundColor: '#212121',
-    borderRadius: 10,
-    padding: 20,
+    backgroundColor: '#1A1A1A',
+    borderRadius: 8,
+    overflow: 'hidden',
     maxHeight: '80%',
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+    backgroundColor: '#1A1A1A',
   },
   modalTitle: {
     color: '#fff',
@@ -1253,7 +1340,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   modalBody: {
-    marginBottom: 10,
+    backgroundColor: '#1A1A1A',
+    maxHeight: '80%',
   },
   modalLabel: {
     color: '#aaa',
@@ -1309,5 +1397,53 @@ const styles = StyleSheet.create({
   },
   selectedModalOptionText: {
     fontWeight: 'bold',
+  },
+  userItem: {
+    marginBottom: 0,
+    borderRadius: 0,
+    backgroundColor: '#1A1A1A',
+    borderBottomWidth: 1,
+    borderBottomColor: '#333',
+  },
+  userItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    position: 'relative',
+  },
+  userInfo: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  userEmail: {
+    fontSize: 14,
+    color: '#777',
+  },
+  loadingText: {
+    marginLeft: 10,
+    color: '#fff',
+  },
+  noUsersContainer: {
+    padding: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#1A1A1A',
+  },
+  noUsersText: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    padding: 15,
+  },
+  userList: {
+    maxHeight: 300,
+  },
+  checkIcon: {
+    position: 'absolute',
+    right: 10,
   },
 }); 

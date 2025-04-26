@@ -55,8 +55,12 @@ const formatNumber = (num: number): string => {
     return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
   }
   
-  // Return the number as is if less than 1000
-  return num.toString();
+  // For smaller numbers, show 2 decimal places for revenue display
+  if (Number.isInteger(num)) {
+    return num.toString();
+  } else {
+    return num.toFixed(2);
+  }
 };
 
 // Generate PDF function

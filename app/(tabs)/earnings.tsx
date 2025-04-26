@@ -42,7 +42,11 @@ type StatsData = {
 
 // Add a formatter function for displaying numbers with commas
 const formatNumber = (num: number): string => {
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  // For decimal values, ensure we show 2 decimal places
+  let formatted = Number.isInteger(num) ? num.toString() : num.toFixed(2);
+  
+  // Add commas for thousands
+  return formatted.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 };
 
 export default function StatsScreen() {

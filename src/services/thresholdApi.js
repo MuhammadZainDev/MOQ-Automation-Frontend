@@ -179,9 +179,41 @@ export const addRevenueToThreshold = async (userId, thresholdId, amount, options
   try {
     const api = await getAuthorizedApi();
     
-    // Build request data
+    // Ensure we're preserving the exact decimal value by keeping it as a string
+    // Log the exact value we're sending to the API
+    console.log(`\n=== THRESHOLD API: addRevenueToThreshold ===`);
+    console.log(`Raw input amount: '${amount}' (type: ${typeof amount})`);
+    
+    // Make sure amount is always passed as a string to preserve decimal places
+    let revenueValue = typeof amount === 'string' ? amount : String(amount);
+    console.log(`After initial conversion: '${revenueValue}'`);
+    
+    // Ensure the decimal format is correct with exactly 2 decimal places
+    if (!revenueValue.includes('.')) {
+      // If no decimal point, add .00
+      console.log(`No decimal point, adding .00`);
+      revenueValue = revenueValue + '.00';
+    } else {
+      // If has decimal point, ensure it has exactly 2 digits after
+      const parts = revenueValue.split('.');
+      console.log(`Split parts:`, parts);
+      
+      if (parts[1].length === 1) {
+        // If only one digit after decimal, add a zero
+        console.log(`Only one decimal digit, adding 0`);
+        revenueValue = revenueValue + '0';
+      } else if (parts[1].length > 2) {
+        // If more than 2 digits after decimal, truncate to 2
+        console.log(`More than 2 decimal digits, truncating`);
+        revenueValue = parts[0] + '.' + parts[1].substring(0, 2);
+      }
+    }
+    
+    console.log(`Final formatted revenue value: '${revenueValue}'`);
+    
+    // Build request data - pass amount as string without any further processing
     const requestData = {
-      revenue: amount,
+      revenue: revenueValue,
       addToThreshold: true,
       thresholdId,
       // Include optional fields if provided
@@ -190,6 +222,8 @@ export const addRevenueToThreshold = async (userId, thresholdId, amount, options
       premium_country_views: options.premiumCountryViews || 0,
       revenue_type: options.revenueType || 'adsense'
     };
+    
+    console.log(`Sending data to backend:`, JSON.stringify(requestData));
     
     const response = await api.patch(`/admin/users/${userId}/analytics-with-threshold`, requestData);
     return response.data;
