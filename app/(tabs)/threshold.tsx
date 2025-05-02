@@ -61,32 +61,27 @@ const ThresholdCard: React.FC<{
 }> = ({ 
   threshold
 }) => {
-  const { name, amount, current = 0, type = 'youtube' } = threshold;
+  const { name, amount = 0, current = 0, type = 'adsense', music_revenue = 0, adsense_revenue = 0 } = threshold;
   
   // Choose icon based on type
   const getIconByType = (type: string): string => {
     return 'logo-youtube';
   };
 
-  // Get the revenues directly from the threshold object,
-  // exactly like in admin dashboard
-  const musicRevenue = typeof threshold.music_revenue === 'number' ? threshold.music_revenue : 0;
-  const adsenseRevenue = typeof threshold.adsense_revenue === 'number' ? threshold.adsense_revenue : 0;
+  // Calculate percentage progress capped at 100%
+  const progress = Math.min(((current || 0) / (amount || 1)) * 100, 100);
   
-  // Calculate total revenue - same as admin dashboard
-  const totalRevenue = musicRevenue + adsenseRevenue;
-  
-  // Use total revenue as the current value - same as admin
-  const effectiveCurrent = totalRevenue;
-  
-  // Calculate progress with safe check
-  console.log(`Threshold card: name=${name}, amount=${amount}, effectiveCurrent=${effectiveCurrent}`);
-  const progress = amount > 0 ? (effectiveCurrent / amount) * 100 : 0;
-  
-  // Check if threshold is completed (100% or more)
+  // Check if threshold is completed
   const isCompleted = progress >= 100;
   
-  // Use red color for all progress bars
+  // Safe values for current amount
+  const effectiveCurrent = current || 0;
+  
+  // Safe values for revenue types
+  const musicRevenue = music_revenue || 0;
+  const adsenseRevenue = adsense_revenue || 0;
+  
+  // Get icon for threshold type
   const color = '#DF0000'; 
   const iconName = getIconByType(type);
   

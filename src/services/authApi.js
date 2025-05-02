@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Axois configuration
 // Use hardcoded base URL instead of API_URL from env
-axios.defaults.baseURL = 'http://192.168.0.104:4000/api';
+axios.defaults.baseURL = 'http://10.0.91.102:4000/api';
 
 // Add auth token to requests if available
 axios.interceptors.request.use(

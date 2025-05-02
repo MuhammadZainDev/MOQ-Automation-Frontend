@@ -55,25 +55,42 @@ type DailyAnalyticsData = {
   premium_country_views: number;
 };
 
+// Utility function to safely call toFixed on possibly undefined values
+const safeToFixed = (num: any, digits: number = 2): string => {
+  // Handle undefined, null, NaN cases
+  if (num === undefined || num === null || isNaN(Number(num))) {
+    return '0' + (digits > 0 ? '.' + '0'.repeat(digits) : '');
+  }
+  
+  // Ensure num is a number
+  const numValue = Number(num);
+  return numValue.toFixed(digits);
+};
+
 // Utility function to format numbers in a human-readable way (1k, 1.2M, etc)
-const formatNumber = (num: number): string => {
+const formatNumber = (num: number | undefined | null): string => {
+  // Handle undefined, null, NaN cases
+  if (num === undefined || num === null || isNaN(num)) {
+    return '0';
+  }
+  
   if (num === 0) return '0';
   
   // Handle millions
   if (num >= 1000000) {
-    return (num / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+    return safeToFixed(num / 1000000, 1).replace(/\.0$/, '') + 'M';
   }
   
   // Handle thousands
   if (num >= 1000) {
-    return (num / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+    return safeToFixed(num / 1000, 1).replace(/\.0$/, '') + 'k';
   }
   
   // For smaller numbers, show 2 decimal places for revenue display
   if (Number.isInteger(num)) {
     return num.toString();
   } else {
-    return num.toFixed(2);
+    return safeToFixed(num, 2);
   }
 };
 
@@ -653,7 +670,7 @@ export default function HomeScreen() {
   const detailedAnalytics = {
     views: {
       value: analyticsData.views || 0,
-      average: ((analyticsData.views || 0) / 28).toFixed(1),
+      average: ((analyticsData.views || 0) / 28).toString().slice(0, 3),
       trend: 'neutral'
     }
   };

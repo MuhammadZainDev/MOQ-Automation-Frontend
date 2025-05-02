@@ -40,10 +40,27 @@ type StatsData = {
   history: HistoryItem[];
 };
 
+// Utility function to safely call toFixed on possibly undefined values
+const safeToFixed = (num: any, digits: number = 2): string => {
+  // Handle undefined, null, NaN cases
+  if (num === undefined || num === null || isNaN(Number(num))) {
+    return '0' + (digits > 0 ? '.' + '0'.repeat(digits) : '');
+  }
+  
+  // Ensure num is a number
+  const numValue = Number(num);
+  return numValue.toFixed(digits);
+};
+
 // Add a formatter function for displaying numbers with commas
-const formatNumber = (num: number): string => {
+const formatNumber = (num: number | undefined | null): string => {
+  // Handle undefined, null, or NaN
+  if (num === undefined || num === null || isNaN(num)) {
+    return "0";
+  }
+  
   // For decimal values, ensure we show 2 decimal places
-  let formatted = Number.isInteger(num) ? num.toString() : num.toFixed(2);
+  let formatted = Number.isInteger(num) ? num.toString() : safeToFixed(num, 2);
   
   // Add commas for thousands
   return formatted.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
@@ -96,7 +113,7 @@ export default function StatsScreen() {
   }, []);
 
   // Process analytics data to get revenue
-  const processStatsData = (data: AnalyticsData): void => {
+  const processStatsData = (data: AnalyticsData | null): void => {
     if (!data) {
       setStatsData({ total: 0, history: [] });
       return;
@@ -108,14 +125,31 @@ export default function StatsScreen() {
     // Generate revenue history from entries if available
     let history: HistoryItem[] = [];
 
-    if (data.entries && data.entries.length > 0) {
+    if (data.entries && Array.isArray(data.entries) && data.entries.length > 0) {
       // Convert entries to history items - use exact revenue values from entries
       // and filter out entries with 0 revenue
       history = data.entries
-        .filter(entry => (entry.revenue || 0) > 0)
+        .filter(entry => {
+          // Make sure revenue exists and is greater than 0
+          const revenue = Number(entry.revenue || 0);
+          return !isNaN(revenue) && revenue > 0;
+        })
         .map((entry, index) => {
-          const entryRevenue = entry.revenue || 0;
-          const createdAt = entry.created_at ? new Date(entry.created_at) : new Date();
+          // Ensure all values are defined with fallbacks
+          const entryRevenue = Number(entry.revenue || 0);
+          let createdAt: Date;
+          
+          try {
+            createdAt = entry.created_at ? new Date(entry.created_at) : new Date();
+            // Validate the date - if invalid, use current date
+            if (isNaN(createdAt.getTime())) {
+              createdAt = new Date();
+            }
+          } catch (e) {
+            // If date parsing fails, use current date
+            createdAt = new Date();
+          }
+          
           const revenueType = entry.revenue_type || 'adsense'; // Default to 'adsense' if not specified
           
           // Check if this revenue came from a threshold
